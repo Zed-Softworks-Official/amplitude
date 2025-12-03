@@ -1,12 +1,12 @@
-use pipewire::{main_loop::MainLoopBox, context::ContextBox};
+use pipewire::{self as pw, spa};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
 pub struct PipeWireClient {
-    main_loop: pw::MainLoop,
-    context: pw::Context,
-    core: pw::Core,
-    registry: pw::Registry,
+    main_loop: pw::MainLoopBox,
+    context: pw::ContextBox,
+    core: pw::CoreBox,
+    registry: pw::RegistryBox,
     event_sender: mpsc::UnboundedSender<AudioEvent>,
 }
 
@@ -20,7 +20,7 @@ pub enum AudioEvent {
 impl PipeWireClient {
     pub fn new() -> anyhow::Result<Self> {
         let main_loop = MainLoopBox::new(None)?;
-        let context = ContextBox::new(&main_loop)?;
+        let context = ContextBox::new(&main_loop_(), None)?;
         let core = context.connect(None)?;
 
         let (event_sender, _event_receiver) = mpsc::unbounded_channel();

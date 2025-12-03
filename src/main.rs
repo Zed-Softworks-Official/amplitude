@@ -1,28 +1,12 @@
-use gtk4 as gtk;
-use gtk::prelude::*;
-use gtk::{glib, Application, ApplicationWindow, Button};
+mod ui;
+
+use gtk4::glib;
+use ui::AmplitudeApplication;
 
 fn main() -> glib::ExitCode {
-    let app = Application::builder()
-        .application_id("dev.zedsoftworks.amplitude")
-        .build();
+    spdlog::default_logger().set_level_filter(spdlog::LevelFilter::All);
 
-    app.connect_activate(|app| {
-        let window = ApplicationWindow::builder()
-            .application(app)
-            .default_width(1280)
-            .default_height(720)
-            .title("Amplitude")
-            .build();
-
-        let button = Button::with_label("Click Me!");
-        button.connect_clicked(|_| {
-            eprintln!("Clicked!");
-        });
-        window.set_child(Some(&button));
-
-        window.present();
-    });
-
-    app.run()
+    let app = AmplitudeApplication::new();
+    app.expect("An Error Occured").run()
 }
+
