@@ -1,11 +1,10 @@
 mod ui;
+mod audio;
 
 use ui::AmplitudeApplication;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = AmplitudeApplication::new();
-    app.expect("An Error Occured").run();
-
-    Ok(())
+async fn main() -> anyhow::Result<()> {
+    let app = AmplitudeApplication::new().await?;
+    app.run()
 }
