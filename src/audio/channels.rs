@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::config::{Channel, Config};
+use crate::config::{Channel, Config, SYSTEM_CHANNEL_NAME};
 
 /// Runtime channel state that tracks which nodes are assigned to which channels
 #[derive(Debug)]
@@ -56,16 +56,32 @@ impl ChannelManager {
         Ok(())
     }
 
-    /// Delete a channel
+    /// Delete a channel (cannot delete built-in channels like System)
     pub fn delete_channel(&mut self, name: &str) -> anyhow::Result<()> {
-        // Move all nodes from this channel to unassigned
+        // Check if this is a built-in channel
+        if let Some(channel) = self.config.get_channel(name) {
+            if channel.is_builtin {
+                anyhow::bail!("Cannot delete built-in channel '{}'", name);
+            }
+        }
+
+        // Move all nodes from this channel to System channel
         if let Some(nodes) = self.channel_to_nodes.remove(name) {
             for node_id in nodes {
                 self.node_to_channel.remove(&node_id);
-                self.unassigned_nodes.insert(node_id);
+                // Move to System channel instead of unassigned
+                self.node_to_channel
+                    .insert(node_id, SYSTEM_CHANNEL_NAME.to_string());
+                self.channel_to_nodes
+                    .entry(SYSTEM_CHANNEL_NAME.to_string())
+                    .or_default()
+                    .insert(node_id);
             }
         }
-        self.config.remove_channel(name);
+
+        if !self.config.remove_channel(name) {
+            anyhow::bail!("Failed to remove channel '{}'", name);
+        }
         self.save_config()?;
         Ok(())
     }
@@ -102,9 +118,9 @@ impl ChannelManager {
     }
 
     /// Called when a new audio node is discovered
-    /// Returns the channel name if auto-assigned, or None if unassigned
+    /// Returns Some(channel_name) if the app is assigned to a channel, None if unassigned
     pub fn on_node_added(&mut self, node_id: u32, app_name: &str) -> Option<String> {
-        // Check if this app has a channel assignment
+        // Check if this app has a channel assignment in config
         if let Some(channel) = self.config.find_channel_for_app(app_name) {
             let channel_name = channel.name.clone();
             self.node_to_channel.insert(node_id, channel_name.clone());
@@ -114,6 +130,7 @@ impl ChannelManager {
                 .insert(node_id);
             Some(channel_name)
         } else {
+            // App is unassigned - add to unassigned set
             self.unassigned_nodes.insert(node_id);
             None
         }
@@ -223,6 +240,21 @@ impl ChannelManager {
         }
         Ok(())
     }
+
+    /// Move a channel to a new position
+    pub fn move_channel(&mut self, name: &str, new_position: usize) -> anyhow::Result<()> {
+        self.config.move_channel(name, new_position);
+        self.save_config()?;
+        Ok(())
+    }
+
+    /// Check if a channel is built-in (cannot be deleted)
+    pub fn is_builtin_channel(&self, name: &str) -> bool {
+        self.config
+            .get_channel(name)
+            .map(|c| c.is_builtin)
+            .unwrap_or(false)
+    }
 }
 
 impl Default for ChannelManager {
@@ -230,4 +262,5 @@ impl Default for ChannelManager {
         Self::new()
     }
 }
+
 

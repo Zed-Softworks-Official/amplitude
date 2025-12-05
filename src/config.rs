@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Name of the built-in system channel
+pub const SYSTEM_CHANNEL_NAME: &str = "System";
+
 /// A channel/submix bus that groups multiple applications
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
@@ -11,6 +14,12 @@ pub struct Channel {
     pub monitor_muted: bool,
     pub stream_volume: f64,
     pub stream_muted: bool,
+    /// Order for display sorting (lower = earlier)
+    #[serde(default)]
+    pub order: usize,
+    /// Whether this is a built-in channel that cannot be deleted
+    #[serde(default)]
+    pub is_builtin: bool,
 }
 
 impl Channel {
@@ -22,6 +31,22 @@ impl Channel {
             monitor_muted: false,
             stream_volume: 0.7,
             stream_muted: false,
+            order: usize::MAX, // New channels go to the end
+            is_builtin: false,
+        }
+    }
+
+    /// Create the built-in System channel
+    pub fn system() -> Self {
+        Self {
+            name: SYSTEM_CHANNEL_NAME.to_string(),
+            applications: Vec::new(),
+            monitor_volume: 0.8,
+            monitor_muted: false,
+            stream_volume: 0.7,
+            stream_muted: false,
+            order: 0, // System channel is always first
+            is_builtin: true,
         }
     }
 
@@ -62,26 +87,46 @@ impl Config {
     /// Load config from disk, or create default if not exists
     pub fn load() -> Self {
         let Some(path) = Self::config_path() else {
-            return Self::default();
+            return Self::default_with_system();
         };
 
         if !path.exists() {
-            return Self::default();
+            return Self::default_with_system();
         }
 
         match fs::read_to_string(&path) {
-            Ok(contents) => match toml::from_str(&contents) {
-                Ok(config) => config,
+            Ok(contents) => match toml::from_str::<Config>(&contents) {
+                Ok(mut config) => {
+                    // Ensure System channel exists
+                    config.ensure_system_channel();
+                    config
+                }
                 Err(e) => {
                     eprintln!("Failed to parse config: {}", e);
-                    Self::default()
+                    Self::default_with_system()
                 }
             },
             Err(e) => {
                 eprintln!("Failed to read config: {}", e);
-                Self::default()
+                Self::default_with_system()
             }
         }
+    }
+
+    /// Create a default config with the System channel
+    fn default_with_system() -> Self {
+        let mut config = Self::default();
+        config.ensure_system_channel();
+        config
+    }
+
+    /// Ensure the System channel exists
+    fn ensure_system_channel(&mut self) {
+        if !self.channels.iter().any(|c| c.name == SYSTEM_CHANNEL_NAME) {
+            self.channels.insert(0, Channel::system());
+        }
+        // Sort channels by order
+        self.channels.sort_by_key(|c| c.order);
     }
 
     /// Save config to disk
@@ -127,12 +172,70 @@ impl Config {
 
     /// Add a new channel
     pub fn add_channel(&mut self, name: String) -> &mut Channel {
-        self.channels.push(Channel::new(name));
+        // Find the highest order value and add 1
+        let max_order = self.channels.iter().map(|c| c.order).max().unwrap_or(0);
+        let mut channel = Channel::new(name);
+        channel.order = max_order + 1;
+        self.channels.push(channel);
         self.channels.last_mut().unwrap()
     }
 
-    /// Remove a channel by name
-    pub fn remove_channel(&mut self, name: &str) {
+    /// Remove a channel by name (cannot remove built-in channels)
+    pub fn remove_channel(&mut self, name: &str) -> bool {
+        let is_builtin = self
+            .channels
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| c.is_builtin)
+            .unwrap_or(false);
+
+        if is_builtin {
+            return false;
+        }
+
         self.channels.retain(|ch| ch.name != name);
+        true
+    }
+
+    /// Reorder channels by providing new order indices
+    pub fn reorder_channels(&mut self, channel_orders: &[(String, usize)]) {
+        for (name, order) in channel_orders {
+            if let Some(channel) = self.get_channel_mut(name) {
+                // Don't allow reordering the System channel to not be first
+                if !channel.is_builtin {
+                    channel.order = *order;
+                }
+            }
+        }
+        self.channels.sort_by_key(|c| c.order);
+    }
+
+    /// Move a channel to a new position
+    pub fn move_channel(&mut self, name: &str, new_position: usize) {
+        // Don't move builtin channels
+        if let Some(channel) = self.get_channel(name) {
+            if channel.is_builtin {
+                return;
+            }
+        }
+
+        // Get current positions
+        let current_pos = self.channels.iter().position(|c| c.name == name);
+        if let Some(current) = current_pos {
+            if current == new_position {
+                return;
+            }
+
+            // Remove and reinsert at new position
+            let channel = self.channels.remove(current);
+            let insert_pos = new_position.min(self.channels.len());
+            self.channels.insert(insert_pos, channel);
+
+            // Update order values to reflect new positions
+            for (i, ch) in self.channels.iter_mut().enumerate() {
+                ch.order = i;
+            }
+        }
     }
 }
+

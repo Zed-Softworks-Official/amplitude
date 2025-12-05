@@ -1,0 +1,506 @@
+/* Amplitude Audio Mixer - Wave Link Inspired Dark Theme */
+
+/* ====== Global Styles ====== */
+* {
+    font-family: "Segoe UI", "SF Pro Display", system-ui, sans-serif;
+}
+
+/* Main window */
+window {
+    background-color: #0d0d0d;
+    color: #e0e0e0;
+}
+
+/* ====== Header Bar ====== */
+headerbar {
+    background-color: #0d0d0d;
+    border-bottom: 1px solid #1a1a1a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    min-height: 48px;
+}
+
+headerbar label {
+    color: #00d4aa;
+    font-weight: 600;
+    font-size: 1.1em;
+    letter-spacing: 1px;
+}
+
+/* ====== Channel Strips ====== */
+.channel-strip {
+    background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+    border: 1px solid #252525;
+    border-radius: 12px;
+    margin: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: all 150ms ease;
+}
+
+.channel-strip:hover {
+    border-color: #00d4aa;
+    box-shadow: 0 4px 16px rgba(0, 212, 170, 0.15);
+}
+
+/* Channel name */
+.channel-name {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.5px;
+}
+
+/* Drag handle */
+.drag-handle {
+    color: #404040;
+    font-size: 0.9em;
+    padding: 0 4px;
+    transition: color 150ms ease;
+}
+
+.drag-handle:hover {
+    color: #00d4aa;
+}
+
+/* Drag-and-drop visual feedback */
+.channel-strip:drop(active) {
+    border-color: #00d4aa;
+    border-style: dashed;
+    background: linear-gradient(180deg, #1f2a28 0%, #141a19 100%);
+}
+
+/* ====== Section Labels ====== */
+.section-label {
+    color: #606060;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+/* Slider labels */
+.slider-label {
+    color: #808080;
+    font-size: 0.65em;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* ====== Sliders ====== */
+scale {
+    margin: 0 2px;
+}
+
+scale trough {
+    background-color: #1a1a1a;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    min-width: 6px;
+}
+
+scale trough highlight {
+    background: linear-gradient(180deg, #00d4aa 0%, #00b894 100%);
+    border-radius: 6px;
+}
+
+scale slider {
+    background: linear-gradient(180deg, #ffffff 0%, #e0e0e0 100%);
+    border: none;
+    border-radius: 50%;
+    min-width: 14px;
+    min-height: 14px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    transition: all 100ms ease;
+}
+
+scale slider:hover {
+    background: linear-gradient(180deg, #00d4aa 0%, #00b894 100%);
+    transform: scale(1.1);
+}
+
+/* ====== Mute Buttons ====== */
+.mute-button {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 2px;
+    border-radius: 6px;
+    background-color: #1a1a1a;
+    color: #606060;
+    border: 1px solid #252525;
+    font-weight: 700;
+    font-size: 0.75em;
+    transition: all 100ms ease;
+}
+
+.mute-button:hover {
+    background-color: #252525;
+    color: #808080;
+    border-color: #353535;
+}
+
+.mute-button:checked {
+    background: linear-gradient(180deg, #ff4757 0%, #c0392b 100%);
+    color: #ffffff;
+    border-color: #ff4757;
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.4);
+}
+
+.mute-button:checked:hover {
+    background: linear-gradient(180deg, #ff6b7a 0%, #e74c3c 100%);
+}
+
+/* ====== Level Meter ====== */
+.level-meter {
+    background-color: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 2px;
+}
+
+/* ====== App Items ====== */
+.app-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    background-color: #1a1a1a;
+    border: 1px solid transparent;
+    margin: 3px 0;
+    transition: all 100ms ease;
+}
+
+.app-item:hover {
+    background-color: #202020;
+    border-color: #303030;
+}
+
+.app-item label {
+    color: #b0b0b0;
+    font-size: 0.8em;
+}
+
+.app-menu-btn {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+    margin: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #505050;
+    border: none;
+}
+
+.app-menu-btn:hover {
+    background-color: #303030;
+    color: #00d4aa;
+}
+
+/* ====== Add Channel Button ====== */
+.add-channel-button {
+    background: linear-gradient(180deg, #141414 0%, #0d0d0d 100%);
+    border: 2px dashed #252525;
+    border-radius: 12px;
+    min-width: 180px;
+    min-height: 300px;
+    padding: 8px;
+    margin: 6px;
+    transition: all 200ms ease;
+}
+
+.add-channel-button:hover {
+    border-color: #00d4aa;
+    background: linear-gradient(180deg, #1a1f1e 0%, #0d1211 100%);
+}
+
+.add-channel-button:active {
+    background: linear-gradient(180deg, #1a2422 0%, #0d1211 100%);
+}
+
+/* Plus icon */
+.add-channel-icon {
+    color: #252525;
+    font-size: 4em;
+    font-weight: 200;
+    transition: all 200ms ease;
+}
+
+.add-channel-button:hover .add-channel-icon {
+    color: #00d4aa;
+    text-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
+}
+
+/* Subtitle text */
+.add-channel-subtitle {
+    color: #353535;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: color 200ms ease;
+}
+
+.add-channel-button:hover .add-channel-subtitle {
+    color: #606060;
+}
+
+/* ====== Unassigned Apps Frame ====== */
+frame {
+    background-color: transparent;
+    border: none;
+}
+
+frame > label {
+    color: #505050;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+frame > border {
+    background-color: #141414;
+    border: 1px solid #1a1a1a;
+    border-radius: 12px;
+}
+
+/* ====== Scrolled Windows ====== */
+scrolledwindow {
+    background-color: transparent;
+}
+
+/* Channel scroll area - thin overlay scrollbar */
+.channel-scroll scrollbar {
+    background-color: transparent;
+    margin-top: 4px;
+}
+
+.channel-scroll scrollbar.horizontal {
+    min-height: 6px;
+    padding: 0;
+}
+
+.channel-scroll scrollbar.horizontal slider {
+    min-height: 4px;
+    border-radius: 2px;
+}
+
+scrollbar {
+    background-color: transparent;
+}
+
+scrollbar slider {
+    background-color: #252525;
+    border-radius: 4px;
+    min-width: 4px;
+    min-height: 30px;
+}
+
+scrollbar slider:hover {
+    background-color: #353535;
+}
+
+scrollbar.horizontal slider {
+    min-height: 4px;
+    min-width: 30px;
+}
+
+/* ====== Separator ====== */
+separator {
+    background-color: #252525;
+    min-height: 1px;
+    min-width: 1px;
+}
+
+/* ====== Dialogs ====== */
+dialog, messagedialog {
+    background-color: #141414;
+    border: 1px solid #252525;
+    border-radius: 12px;
+}
+
+dialog headerbar, messagedialog headerbar {
+    background-color: #1a1a1a;
+    border-radius: 12px 12px 0 0;
+}
+
+dialog entry, messagedialog entry {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    padding: 10px 12px;
+    caret-color: #00d4aa;
+}
+
+dialog entry:focus, messagedialog entry:focus {
+    border-color: #00d4aa;
+    box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.2);
+}
+
+dialog button, messagedialog button {
+    background-color: #1a1a1a;
+    color: #b0b0b0;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 100ms ease;
+}
+
+dialog button:hover, messagedialog button:hover {
+    background-color: #252525;
+    color: #e0e0e0;
+    border-color: #353535;
+}
+
+dialog button.suggested-action, messagedialog button.suggested-action {
+    background: linear-gradient(180deg, #00d4aa 0%, #00b894 100%);
+    color: #0d0d0d;
+    border-color: #00d4aa;
+    font-weight: 600;
+}
+
+dialog button.suggested-action:hover, messagedialog button.suggested-action:hover {
+    background: linear-gradient(180deg, #00e6b8 0%, #00cca4 100%);
+}
+
+/* ====== Dropdown ====== */
+dropdown {
+    background-color: #1a1a1a;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #e0e0e0;
+}
+
+dropdown:hover {
+    border-color: #353535;
+}
+
+dropdown popover {
+    background-color: #1a1a1a;
+    border: 1px solid #252525;
+    border-radius: 8px;
+}
+
+dropdown popover modelbutton {
+    padding: 8px 12px;
+    color: #b0b0b0;
+}
+
+dropdown popover modelbutton:hover {
+    background-color: #252525;
+    color: #e0e0e0;
+}
+
+dropdown popover modelbutton:selected {
+    background-color: #00d4aa;
+    color: #0d0d0d;
+}
+
+/* ====== Tooltips ====== */
+tooltip {
+    background-color: #1a1a1a;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 6px 10px;
+}
+
+/* ====== Unassigned Apps Button ====== */
+.unassigned-apps-button {
+    background-color: #1a1a1a;
+    border: 1px solid #252525;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #808080;
+    transition: all 150ms ease;
+}
+
+.unassigned-apps-button:hover {
+    background-color: #252525;
+    border-color: #353535;
+    color: #00d4aa;
+}
+
+.unassigned-apps-button.has-unassigned {
+    background: linear-gradient(180deg, #ff8c00 0%, #ff6600 100%);
+    color: #ffffff;
+    border-color: #ff8c00;
+}
+
+.unassigned-apps-button.has-unassigned:hover {
+    background: linear-gradient(180deg, #ffa030 0%, #ff7720 100%);
+}
+
+/* Popover styles */
+popover {
+    background-color: #141414;
+    border: 1px solid #252525;
+    border-radius: 12px;
+}
+
+popover contents {
+    background-color: transparent;
+}
+
+.popover-title {
+    color: #808080;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.unassigned-app-row {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background-color: #1a1a1a;
+    border: 1px solid transparent;
+    margin: 3px 0;
+    transition: all 100ms ease;
+}
+
+.unassigned-app-row:hover {
+    background-color: #202020;
+    border-color: #303030;
+}
+
+.unassigned-app-row label {
+    color: #b0b0b0;
+    font-size: 0.85em;
+}
+
+/* ====== Bus Strips ====== */
+.bus-section {
+    padding-left: 4px;
+}
+
+.bus-strip {
+    background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+    border: 1px solid #252525;
+    border-radius: 8px;
+    margin: 6px 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.bus-strip.monitor-bus {
+    border-color: #00d4aa;
+    box-shadow: 0 2px 8px rgba(0, 212, 170, 0.15);
+}
+
+.bus-strip.stream-bus {
+    border-color: #9b59b6;
+    box-shadow: 0 2px 8px rgba(155, 89, 182, 0.15);
+}
+
+.bus-name {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.3px;
+}
+
+.bus-mute {
+    min-width: 22px;
+    min-height: 22px;
+    padding: 1px;
+    font-size: 0.65em;
+}
