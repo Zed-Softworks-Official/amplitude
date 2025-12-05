@@ -1,5 +1,6 @@
 mod ui;
 mod audio;
+mod config;
 
 use ui::AmplitudeApplication;
 
