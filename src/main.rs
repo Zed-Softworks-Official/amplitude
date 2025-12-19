@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod pipewire;
 
 use cxx_qt::casting::Upcast;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQmlEngine, QUrl};

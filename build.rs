@@ -7,6 +7,7 @@ fn main() {
     )
         .files([
             "src/audio/channel.rs",
+            "src/audio/bus.rs",
         ])
         .build();
 }
