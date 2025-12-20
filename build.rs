@@ -6,8 +6,7 @@ fn main() {
             .qml_file("qml/main.qml")
     )
         .files([
-            "src/audio/channel.rs",
-            "src/audio/bus.rs",
+            "src/pipewire/pw_core.rs",
         ])
         .build();
 }

@@ -5,7 +5,15 @@ use cxx_qt::casting::Upcast;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQmlEngine, QUrl};
 use std::pin::Pin;
 
+use env_logger::Builder;
+
 fn main() {
+    Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
+
+    log::info!("Log initalized");
+
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();
 

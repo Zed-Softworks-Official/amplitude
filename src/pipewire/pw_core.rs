@@ -14,6 +14,7 @@ pub mod qobject {
 use pw::{main_loop::MainLoopRc, context::ContextRc, core::CoreRc};
 use cxx_qt::CxxQtType;
 use core::pin::Pin;
+use log::{info, error};
 
 #[derive(Default)]
 pub struct PwCoreObject {
@@ -23,11 +24,11 @@ pub struct PwCoreObject {
 }
 
 impl qobject::PwCore {
-    pub fn initialize(mut self: Pin<&mut Self>) -> bool {
+    fn initialize(mut self: Pin<&mut Self>) -> bool {
         let mainloop = match MainLoopRc::new(None) {
             Ok(mainloop) => mainloop,
             Err(err) => {
-                eprintln!("Failed to create mainloop: {}", err);
+                error!("failed to create mainloop: {}", err);
                 return false;
             }
         };
@@ -35,7 +36,7 @@ impl qobject::PwCore {
         let context = match ContextRc::new(&mainloop, None) {
             Ok(context) => context,
             Err(err) => {
-                eprintln!("Failed to create context: {}", err);
+                error!("failed to create context: {}", err);
                 return false;
             }
         };
@@ -43,7 +44,7 @@ impl qobject::PwCore {
         let core = match context.connect_rc(None) {
             Ok(core) => core,
             Err(err) => {
-                eprintln!("Failed to connect to context: {}", err);
+                error!("failed to connect context: {}", err);
                 return false;
             }
         };
@@ -52,7 +53,7 @@ impl qobject::PwCore {
         self.as_mut().rust_mut().context = Some(context);
         self.as_mut().rust_mut().core = Some(core);
 
-        println!("Initialized pipewire");
+        info!("pipewire initialized");
 
         true
     }

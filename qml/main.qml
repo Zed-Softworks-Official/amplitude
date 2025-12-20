@@ -11,7 +11,21 @@ ApplicationWindow {
     visible: true
     color: palette.window
 
+    PwCore {
+        id: pwCore
+
+        Component.onCompleted: {
+            if (!pwCore.initialize()) {
+                console.error("Failed to initialize pipewire")
+                errorDialog.open()
+            }
+        }
+    }
+
     Column {
+        PwCore {
+        }
+
         anchors.fill: parent
         anchors.margins: 10
         spacing: 10
