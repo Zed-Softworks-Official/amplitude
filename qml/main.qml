@@ -20,6 +20,10 @@ ApplicationWindow {
                 errorDialog.open()
             }
         }
+
+        Component.onDestruction: {
+            pwCore.cleanup()
+        }
     }
 
     Column {

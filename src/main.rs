@@ -25,7 +25,7 @@ fn main() {
         let engine: Pin<&mut QQmlEngine> = engine.upcast_pin();
         engine
             .on_quit(|_| {
-                println!("Quitting...");
+                log::info!("Quitting");
             })
             .release();
     }
