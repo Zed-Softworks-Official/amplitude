@@ -130,15 +130,8 @@ fn pw_thread(
                 let _ = evt_tx_clone.send(PwEvent::NodeAdded(node));
             }
         })
+            // Remove Node
         .register();
-            /*
-        .global_remove(move |id| {
-            let mut reg = registry_clone.lock().unwrap();
-            reg.remove_node(&id);
-
-            let _ = evt_tx_clone.send(PwEvent::NodeRemoved(id));
-        });
-*/
 
     let _receiver = cmd_rx.attach(&mainloop.loop_(), {
         let mainloop = mainloop.clone();

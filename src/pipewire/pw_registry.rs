@@ -69,9 +69,9 @@ impl PwRegistry {
         self.nodes.insert(global.id, node);
     }
 
-    pub fn remove_node(&mut self, id: u32) {
+    pub fn remove_node(&mut self, id: &u32) {
         log::info!("Node removed: {}", id);
-        self.nodes.remove(&id);
+        self.nodes.remove(id);
     }
 
     pub fn get_node(&self, id: u32) -> Option<&AudioNode> {
