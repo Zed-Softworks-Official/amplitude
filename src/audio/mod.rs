@@ -1,5 +1,8 @@
-pub mod audio_manager;
-
-mod channel;
 mod channel_manager;
+mod channel;
 mod bus;
+
+pub mod audio_manager;
+pub use channel::NewChannelData;
+
+

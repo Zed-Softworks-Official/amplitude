@@ -3,9 +3,9 @@ use uuid::Uuid;
 use iced::widget::{
     button,
     column,
+    text_input,
     row,
     text,
-    Column,
     container,
     Scrollable,
     scrollable::{Direction, Scrollbar},
@@ -17,34 +17,59 @@ use iced::{
 };
 
 use crate::audio::audio_manager::{AudioManager, ChannelBus};
+use crate::audio::NewChannelData;
+use crate::core::modal::{Modal, modal};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default)]
 pub struct App {
     audio_manager: AudioManager,
+    create_channel_modal: Modal<NewChannelData>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    // Channels
     AddChannel,
 
+    // Audio
     MonitorVolumeChanged(Uuid, f32),
     StreamVolumeChanged(Uuid, f32),
 
     MonitorMuteToggled(Uuid),
     StreamMuteToggled(Uuid),
+
+    // Modal
+    ShowModal,
+    HideModal,
+    NewChannelContentChanged(String)
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
-            audio_manager: AudioManager::new()
+            audio_manager: AudioManager::new(),
+            create_channel_modal: Modal::new(NewChannelData {
+                name: "".to_string()
+            })
         }
     }
 
     pub fn update(&mut self, msg: Message) {
         match msg {
+            Message::ShowModal => {
+                self.create_channel_modal.show();
+            },
+            Message::HideModal => {
+                self.create_channel_modal.hide();
+            },
             Message::AddChannel => {
-                self.audio_manager.add_channel("Channel 1");
+                self.audio_manager.add_channel(
+                    self.create_channel_modal.data
+                        .as_ref()
+                        .unwrap()
+                        .name
+                        .as_str()
+                );
             },
             Message::MonitorVolumeChanged(uuid, volume) => {
                 println!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
@@ -62,13 +87,16 @@ impl App {
                 println!("Stream Mute Toggled");
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
+            Message::NewChannelContentChanged(content) => {
+                self.create_channel_modal.data.as_mut().unwrap().name = content;
+            }
         };
     }
 
-    pub fn view(&self) -> Column<Message> {
+    pub fn view(&self) -> iced::Element<Message> {
         // Channel Button
         let add_channel_button = button(text("+").center())
-            .on_press(Message::AddChannel)
+            .on_press(Message::ShowModal)
             .height(Length::Fill);
 
         // Channel Strips
@@ -107,6 +135,39 @@ impl App {
         let interface = column![channel_section, bus_strip]
             .spacing(20);
 
-        interface
+        if self.create_channel_modal.show_modal {
+            modal(interface, self.new_channel_modal(), Message::HideModal)
+        } else {
+            interface.into()
+        }
+    }
+
+    fn new_channel_modal(&self) -> iced::Element<'_, Message> {
+        container(column![
+            text("Create a new channel"),
+            text_input(
+                "Channel Name",
+                &self.create_channel_modal.data.as_ref().unwrap().name,
+            )
+                .on_input(Message::NewChannelContentChanged)
+                .padding(5),
+            row![
+                container(
+                    button(text("Cancel"))
+                        .on_press(Message::HideModal)
+                        .style(button::danger)
+                ).align_left(iced::Fill),
+                container(
+button(text("Create"))
+                    .on_press(Message::AddChannel)
+                    .style(button::primary)
+
+                ).align_right(iced::Fill),
+                            ].width(Length::Fill)
+        ].spacing(10))
+            .padding(padding::vertical(10).horizontal(20))
+            .style(container::rounded_box)
+            .max_width(400)
+            .into()
     }
 }

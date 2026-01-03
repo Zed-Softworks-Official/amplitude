@@ -3,7 +3,7 @@ mod audio;
 
 use lucide_icons::LUCIDE_FONT_BYTES;
 use iced::Theme;
-use crate::core::app::{App};
+use crate::core::app::App;
 
 fn main() -> iced::Result {
     let settings = iced::Settings {

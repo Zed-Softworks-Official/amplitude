@@ -106,3 +106,8 @@ impl Channel {
             .into()
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct NewChannelData {
+    pub name: String,
+}
