@@ -7,6 +7,7 @@ use crate::audio::{
     channel::Channel
 };
 
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
     Monitor,
     Stream
@@ -15,15 +16,15 @@ pub enum ChannelBus {
 #[derive(Default, Debug, Clone)]
 pub struct AudioManager {
     channel_manager: ChannelManager,
-    buses: HashMap<String, Bus>
+    buses: HashMap<ChannelBus, Bus>
 }
 
 impl AudioManager {
     pub fn new() -> Self {
         let buses = HashMap::from(
             [
-                ("Monitor".to_string(), Bus::new("Monitor".to_string())),
-                ("Stream".to_string(), Bus::new("Stream".to_string()))
+                (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
+                (ChannelBus::Stream, Bus::new("Stream".to_string()))
             ]);
 
         Self {
@@ -57,7 +58,7 @@ impl AudioManager {
         self.channel_manager.get_channels()
     }
 
-    pub fn get_busses(&self) -> &HashMap<String, Bus> {
+    pub fn get_busses(&self) -> &HashMap<ChannelBus, Bus> {
         &self.buses
     }
 }

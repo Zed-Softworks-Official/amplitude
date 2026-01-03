@@ -14,5 +14,6 @@ fn main() -> iced::Result {
     iced::application(App::new, App::update, App::view)
         .theme(Theme::Dark)
         .settings(settings)
+        .title("Amplitude")
         .run()
 }

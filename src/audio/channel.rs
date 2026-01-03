@@ -1,6 +1,7 @@
 use uuid::Uuid;
 
 use crate::core::app::Message;
+use crate::audio::bus::{BusOptions};
 
 use iced::widget::{
     Text,
@@ -30,10 +31,8 @@ pub struct Channel {
     pub id: Uuid,
     pub icon: fn() -> Text<'static>,
     pub channel_name: String,
-    pub monitor_volume: f32,
-    pub monitor_mute: bool,
-    pub stream_volume: f32,
-    pub stream_mute: bool
+    pub monitor_bus_options: BusOptions,
+    pub stream_bus_options: BusOptions
 }
 
 impl Channel {
@@ -45,10 +44,8 @@ impl Channel {
             id: Uuid::new_v4(),
             channel_name,
             icon,
-            monitor_volume: 0.8,
-            monitor_mute: false,
-            stream_volume: 0.8,
-            stream_mute: false,
+            monitor_bus_options: BusOptions::new("Monitor".to_string(), 0.8, false),
+            stream_bus_options: BusOptions::new("Stream".to_string(), 0.8, false),
         }
     }
 
@@ -59,13 +56,13 @@ impl Channel {
             column![
                 vertical_slider(
                     0.0..=1.0,
-                    self.monitor_volume,
+                    self.monitor_bus_options.volume,
                     |v| Message::MonitorVolumeChanged(self.id, v)
                 ).step(0.1),
                 icon_headphones().size(20),
                 button(text("Mute"))
                     .on_press(Message::MonitorMuteToggled(self.id))
-                    .style(match self.monitor_mute {
+                    .style(match self.monitor_bus_options.muted {
                         true => button::danger,
                         false => button::primary
                     })
@@ -73,13 +70,13 @@ impl Channel {
             column![
                 vertical_slider(
                     0.0..=1.0,
-                    self.stream_volume,
+                    self.stream_bus_options.volume,
                     |v| Message::StreamVolumeChanged(self.id, v)
                 ).step(0.1),
                 icon_podcast().size(20),
                 button(text("Mute"))
                     .on_press(Message::StreamMuteToggled(self.id))
-                    .style(match self.stream_mute {
+                    .style(match self.stream_bus_options.muted {
                         true => button::danger,
                         false => button::primary
                     })

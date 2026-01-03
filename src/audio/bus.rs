@@ -57,3 +57,22 @@ impl Bus {
             .into()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct BusOptions {
+    pub name: String,
+    pub volume: f32, // Volume for slider
+    pub level: f32, // Level for vu meter
+    pub muted: bool
+}
+
+impl BusOptions {
+    pub fn new(name: String, volume: f32, muted: bool) -> Self {
+        BusOptions {
+            name,
+            level: volume.clamp(0.0, 1.0),
+            volume,
+            muted
+        }
+    }
+}

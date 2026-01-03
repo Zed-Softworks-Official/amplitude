@@ -32,12 +32,12 @@ impl ChannelManager {
         match bus {
             ChannelBus::Monitor => {
                 if let Some(channel) = self.channels.get_mut(&uuid) {
-                    channel.monitor_mute = !channel.monitor_mute;
+                    channel.monitor_bus_options.muted = !channel.monitor_bus_options.muted;
                 }
             },
             ChannelBus::Stream => {
                 if let Some(channel) = self.channels.get_mut(&uuid) {
-                    channel.stream_mute = !channel.stream_mute;
+                    channel.stream_bus_options.muted = !channel.stream_bus_options.muted;
                 }
             }
         }
@@ -52,12 +52,12 @@ impl ChannelManager {
         match bus {
             ChannelBus::Monitor => {
                 if let Some(channel) = self.channels.get_mut(&uuid) {
-                    channel.monitor_volume = volume;
+                    channel.monitor_bus_options.volume = volume;
                 }
             },
             ChannelBus::Stream => {
                 if let Some(channel) = self.channels.get_mut(&uuid) {
-                    channel.stream_volume = volume;
+                    channel.stream_bus_options.volume = volume;
                 }
             }
         };
