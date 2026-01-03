@@ -45,8 +45,10 @@ name = "amplitude"
 version = "0.1.0"
 dependencies = [
  "iced",
+ "lucide-icons",
  "pipewire",
  "toml",
+ "uuid",
 ]
 
 [[package]]
@@ -1636,6 +1638,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96051b46fc183dc9cd4a223960ef37b9af631b55191852a8274bfef064cda20f"
 
 [[package]]
+name = "lucide-icons"
+version = "0.562.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db8acecc97d96f9f8e70ae6fed025b6d962d8c88d85bdbcf16916e9f7ad23e0f"
+dependencies = [
+ "iced",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3165,6 +3176,7 @@ version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
+ "getrandom",
  "js-sys",
  "serde_core",
  "wasm-bindgen",
