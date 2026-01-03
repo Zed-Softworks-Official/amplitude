@@ -158,12 +158,12 @@ impl App {
                         .style(button::danger)
                 ).align_left(iced::Fill),
                 container(
-button(text("Create"))
-                    .on_press(Message::AddChannel)
-                    .style(button::primary)
+                    button(text("Create"))
+                        .on_press(Message::AddChannel)
+                        .style(button::primary)
 
                 ).align_right(iced::Fill),
-                            ].width(Length::Fill)
+            ].width(Length::Fill)
         ].spacing(10))
             .padding(padding::vertical(10).horizontal(20))
             .style(container::rounded_box)
