@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use iced::widget::{
     button,
     column,
@@ -14,7 +16,7 @@ use iced::{
     padding,
 };
 
-use crate::audio::channel_manager::ChannelManager;
+use crate::audio::channel_manager::{ChannelManager, ChannelBus};
 
 #[derive(Debug, Default, Clone)]
 pub struct App {
@@ -25,11 +27,11 @@ pub struct App {
 pub enum Message {
     AddChannel,
 
-    MonitorVolumeChanged(f32),
-    StreamVolumeChanged(f32),
+    MonitorVolumeChanged(Uuid, f32),
+    StreamVolumeChanged(Uuid, f32),
 
-    MonitorMuteToggled,
-    StreamMuteToggled,
+    MonitorMuteToggled(Uuid),
+    StreamMuteToggled(Uuid),
 }
 
 impl App {
@@ -44,17 +46,21 @@ impl App {
             Message::AddChannel => {
                 self.channel_manager.add_channel("Channel 1");
             },
-            Message::MonitorVolumeChanged(volume) => {
-                println!("Monitor Volume Changed: {}", volume);
+            Message::MonitorVolumeChanged(uuid, volume) => {
+                println!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
+                self.channel_manager.update_volume(uuid, volume, ChannelBus::Monitor);
             },
-            Message::StreamVolumeChanged(volume) => {
-                println!("Stream Volume Changed: {}", volume);
+            Message::StreamVolumeChanged(uuid, volume) => {
+                println!("Stream Volume Changed: {} (uuid: {})", volume, uuid);
+                self.channel_manager.update_volume(uuid, volume, ChannelBus::Stream);
             }
-            Message::MonitorMuteToggled => {
+            Message::MonitorMuteToggled(uuid) => {
                 println!("Monitor Mute Toggled");
+                self.channel_manager.toggle_mute(uuid, ChannelBus::Monitor);
             },
-            Message::StreamMuteToggled => {
+            Message::StreamMuteToggled(uuid) => {
                 println!("Stream Mute Toggled");
+                self.channel_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
         };
     }
@@ -66,19 +72,22 @@ impl App {
             .height(Length::Fill);
 
         // Channel Strips
-        let channels = column(
+        let channels = row(
             self.channel_manager.get_channels()
                 .iter()
-                .map(|(_id, channel)| channel.view())
+                .map(|(_id, channel)| channel.view().into())
         ).spacing(10);
 
         let channel_strip = Scrollable::new(channels)
-            .direction(Direction::Vertical(Scrollbar::new()));
+            .direction(Direction::Horizontal(Scrollbar::new()));
 
         // Channel Section
         let channel_section = container(
-            row![channel_strip, add_channel_button]
-                .spacing(20)
+            column![
+                text("INPUTS"),
+                row![channel_strip, add_channel_button]
+                    .spacing(20)
+            ].spacing(10)
         )
             .padding(padding::vertical(10).left(20).right(20))
             .style(container::rounded_box)

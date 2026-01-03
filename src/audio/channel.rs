@@ -5,6 +5,7 @@ use crate::core::app::Message;
 use iced::widget::{
     Text,
     text,
+    container,
     column,
     button,
     row,
@@ -41,16 +42,16 @@ impl Channel {
     pub fn view(&self) -> iced::Element<'_, Message> {
         let channel_name = text(self.channel_name.clone());
 
-        let sliders = row![
+        let sliders = container(row![
             column![
                 text("Monitor"),
                 vertical_slider(
                     0.0..=1.0,
                     self.monitor_volume,
-                    Message::MonitorVolumeChanged
+                    |v| Message::MonitorVolumeChanged(self.id, v)
                 ).step(0.1),
                 button(text("Mute"))
-                    .on_press(Message::MonitorMuteToggled)
+                    .on_press(Message::MonitorMuteToggled(self.id))
                     .style(match self.monitor_mute {
                         true => button::danger,
                         false => button::primary
@@ -61,16 +62,16 @@ impl Channel {
                 vertical_slider(
                     0.0..=1.0,
                     self.stream_volume,
-                    Message::StreamVolumeChanged
+                    |v| Message::StreamVolumeChanged(self.id, v)
                 ).step(0.1),
                 button(text("Mute"))
-                    .on_press(Message::StreamMuteToggled)
+                    .on_press(Message::StreamMuteToggled(self.id))
                     .style(match self.stream_mute {
                         true => button::danger,
                         false => button::primary
                     })
             ].spacing(20)
-        ].spacing(10);
+        ].spacing(10));
 
         column![
             row![

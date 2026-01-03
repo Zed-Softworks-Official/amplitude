@@ -9,6 +9,11 @@ pub struct ChannelManager {
     channels: HashMap<Uuid, Channel>
 }
 
+pub enum ChannelBus {
+    Monitor,
+    Stream
+}
+
 impl ChannelManager {
     pub fn new() -> Self {
         ChannelManager {
@@ -21,6 +26,45 @@ impl ChannelManager {
         self.channels.insert(channel.id, channel.clone());
 
         channel.id
+    }
+
+    pub fn toggle_mute(
+        &mut self,
+        uuid: Uuid,
+        bus: ChannelBus
+    ) {
+        match bus {
+            ChannelBus::Monitor => {
+                if let Some(channel) = self.channels.get_mut(&uuid) {
+                    channel.monitor_mute = !channel.monitor_mute;
+                }
+            },
+            ChannelBus::Stream => {
+                if let Some(channel) = self.channels.get_mut(&uuid) {
+                    channel.stream_mute = !channel.stream_mute;
+                }
+            }
+        }
+    }
+
+    pub fn update_volume(
+        &mut self,
+        uuid: Uuid,
+        volume: f32,
+        bus: ChannelBus
+    ) {
+        match bus {
+            ChannelBus::Monitor => {
+                if let Some(channel) = self.channels.get_mut(&uuid) {
+                    channel.monitor_volume = volume;
+                }
+            },
+            ChannelBus::Stream => {
+                if let Some(channel) = self.channels.get_mut(&uuid) {
+                    channel.stream_volume = volume;
+                }
+            }
+        };
     }
 
     pub fn get_channels(&self) -> &HashMap<Uuid, Channel> {
