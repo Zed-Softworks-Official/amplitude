@@ -9,11 +9,6 @@ pub struct ChannelManager {
     channels: HashMap<Uuid, Channel>
 }
 
-pub enum ChannelBus {
-    Monitor,
-    Stream
-}
-
 impl ChannelManager {
     pub fn new() -> Self {
         ChannelManager {

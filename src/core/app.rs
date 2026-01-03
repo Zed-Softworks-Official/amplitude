@@ -16,7 +16,7 @@ use iced::{
     padding,
 };
 
-use crate::audio::channel_manager::{ChannelManager, ChannelBus};
+use crate::audio::audio_manager::{AudioManager, ChannelBus};
 
 #[derive(Debug, Default, Clone)]
 pub struct App {
