@@ -1,4 +1,5 @@
-struct Bus {
+#[derive(Debug, Clone)]
+pub struct Bus {
     id: String,
     volume: f32,
     muted: bool,

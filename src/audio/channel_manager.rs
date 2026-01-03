@@ -2,6 +2,7 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::audio::channel::Channel;
+use crate::audio::audio_manager::ChannelBus;
 use lucide_icons::iced::icon_speaker;
 
 #[derive(Default, Debug, Clone)]
