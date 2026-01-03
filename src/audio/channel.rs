@@ -8,6 +8,7 @@ use iced::widget::{
     text,
     container,
     column,
+    progress_bar,
     button,
     row,
     vertical_slider,
@@ -18,7 +19,7 @@ use iced::{
     Background,
     Color,
     Border,
-    Alignment,
+    Alignment
 };
 
 use lucide_icons::iced::{
@@ -89,6 +90,7 @@ impl Channel {
                     (self.icon)(),
                     channel_name
                 ].spacing(10),
+                progress_bar(0.0..=1.0, self.monitor_bus_options.level),
                 sliders
             ].spacing(10))
             .padding(padding::top(20).left(10).right(10).bottom(20))
