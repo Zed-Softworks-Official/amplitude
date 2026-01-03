@@ -45,8 +45,8 @@ impl Channel {
             id: Uuid::new_v4(),
             channel_name,
             icon,
-            monitor_bus_options: BusOptions::new("Monitor".to_string(), 0.8, false),
-            stream_bus_options: BusOptions::new("Stream".to_string(), 0.8, false),
+            monitor_bus_options: BusOptions::new(0.8, false),
+            stream_bus_options: BusOptions::new(0.8, false),
         }
     }
 

@@ -1,4 +1,5 @@
 use uuid::Uuid;
+use lucide_icons::iced::icon_plus;
 
 use iced::widget::{
     button,
@@ -14,6 +15,9 @@ use iced::widget::{
 use iced::{
     Length,
     padding,
+    Alignment,
+    Theme,
+    Border,
 };
 
 use crate::audio::audio_manager::{AudioManager, ChannelBus};
@@ -93,11 +97,31 @@ impl App {
         };
     }
 
-    pub fn view(&self) -> iced::Element<Message> {
+    pub fn view(&self) -> iced::Element<'_, Message> {
         // Channel Button
-        let add_channel_button = button(text("+").center())
+        let button_content = container(column![
+            icon_plus().size(35),
+            text("Add Channel").size(20).center()
+        ].spacing(10).align_x(Alignment::Center)
+        )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Center);
+
+        let add_channel_button = button(button_content)
             .on_press(Message::ShowModal)
-            .height(Length::Fill);
+            .width(Length::Fixed(100.0))
+            .height(Length::Fill)
+            .style(|theme: &Theme, status| {
+                let mut style = button::secondary(theme, status);
+                style.border = Border {
+                    radius: 8.0.into(),
+                    ..style.border
+                };
+
+                style
+            });
 
         // Channel Strips
         let channels = row(

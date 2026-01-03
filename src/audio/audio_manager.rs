@@ -23,8 +23,9 @@ impl AudioManager {
     pub fn new() -> Self {
         let buses = HashMap::from(
             [
+
+                (ChannelBus::Stream, Bus::new("Stream".to_string())),
                 (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
-                (ChannelBus::Stream, Bus::new("Stream".to_string()))
             ]);
 
         Self {
