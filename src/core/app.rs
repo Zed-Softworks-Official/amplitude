@@ -101,7 +101,7 @@ impl App {
                 .map(|(_name, bus)| bus.view().into())
         ).spacing(10);
 
-        let bus_strip = container(busses)
+        let bus_strip = container(column![text("OUTPUT"), busses].spacing(10))
             .padding(padding::top(10).bottom(20).horizontal(20));
 
         let interface = column![channel_section, bus_strip]

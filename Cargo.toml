@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = "0.14.0"
+iced = { version = "0.14.0", features = ["canvas"] }
 lucide-icons = { version = "0.562.0", features= ["iced"] }
 toml = "0.9.10"
 uuid = { version = "1.19.0", features = ["v4"] }

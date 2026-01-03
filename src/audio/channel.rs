@@ -17,6 +17,12 @@ use iced::{
     Background,
     Color,
     Border,
+    Alignment,
+};
+
+use lucide_icons::iced::{
+    icon_headphones,
+    icon_podcast
 };
 
 #[derive(Debug, Clone)]
@@ -51,26 +57,26 @@ impl Channel {
 
         let sliders = container(row![
             column![
-                text("Monitor"),
                 vertical_slider(
                     0.0..=1.0,
                     self.monitor_volume,
                     |v| Message::MonitorVolumeChanged(self.id, v)
                 ).step(0.1),
+                icon_headphones().size(20),
                 button(text("Mute"))
                     .on_press(Message::MonitorMuteToggled(self.id))
                     .style(match self.monitor_mute {
                         true => button::danger,
                         false => button::primary
                     })
-            ].spacing(20),
+            ].spacing(20).align_x(Alignment::Center),
             column![
-                text("Stream"),
                 vertical_slider(
                     0.0..=1.0,
                     self.stream_volume,
                     |v| Message::StreamVolumeChanged(self.id, v)
                 ).step(0.1),
+                icon_podcast().size(20),
                 button(text("Mute"))
                     .on_press(Message::StreamMuteToggled(self.id))
                     .style(match self.stream_mute {
@@ -87,7 +93,7 @@ impl Channel {
                     channel_name
                 ].spacing(10),
                 sliders
-            ])
+            ].spacing(10))
             .padding(padding::top(20).left(10).right(10).bottom(20))
             .style(|_| container::Style {
                 background: Some(Background::Color(Color::from_rgb(0.15, 0.15, 0.15))),

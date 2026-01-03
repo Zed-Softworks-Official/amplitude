@@ -2,8 +2,8 @@ use crate::core::app::Message;
 
 use iced::widget::{
     text,
-    progress_bar,
     button,
+    progress_bar,
     row,
     container
 };
@@ -13,6 +13,7 @@ use iced::{
     Color,
     Background,
     padding,
+    Alignment
 };
 
 #[derive(Debug, Clone)]
@@ -32,6 +33,7 @@ impl Bus {
     }
 
     pub fn view(&self) -> iced::Element<'_, Message> {
+
         let bus_strip = row![
             text(self.name.clone()),
             progress_bar(0.0..=1.0, self.level),
@@ -39,7 +41,7 @@ impl Bus {
                 true => button::danger,
                 false => button::primary,
             })
-        ].spacing(10);
+        ].spacing(10).align_y(Alignment::Center);
 
         container(bus_strip)
             .padding(padding::vertical(10).horizontal(20))
