@@ -56,4 +56,8 @@ impl AudioManager {
     pub fn get_channels(&self) -> &HashMap<Uuid, Channel> {
         self.channel_manager.get_channels()
     }
+
+    pub fn get_busses(&self) -> &HashMap<String, Bus> {
+        &self.buses
+    }
 }

@@ -94,7 +94,17 @@ impl App {
             .width(Length::Fill)
             .height(Length::Fill);
 
-        let interface = column![channel_section]
+        // Buses
+        let busses = column(
+            self.audio_manager.get_busses()
+                .iter()
+                .map(|(_name, bus)| bus.view().into())
+        ).spacing(10);
+
+        let bus_strip = container(busses)
+            .padding(padding::top(10).bottom(20).horizontal(20));
+
+        let interface = column![channel_section, bus_strip]
             .spacing(20);
 
         interface
