@@ -12,6 +12,13 @@ use iced::widget::{
     vertical_slider,
 };
 
+use iced::{
+    padding,
+    Background,
+    Color,
+    Border,
+};
+
 #[derive(Debug, Clone)]
 pub struct Channel {
     pub id: Uuid,
@@ -73,12 +80,24 @@ impl Channel {
             ].spacing(20)
         ].spacing(10));
 
-        column![
-            row![
-                (self.icon)(),
-                channel_name
-            ].spacing(10),
-            sliders
-        ].into()
+        container(
+            column![
+                row![
+                    (self.icon)(),
+                    channel_name
+                ].spacing(10),
+                sliders
+            ])
+            .padding(padding::top(20).left(10).right(10).bottom(20))
+            .style(|_| container::Style {
+                background: Some(Background::Color(Color::from_rgb(0.15, 0.15, 0.15))),
+                border: Border {
+                    radius: 8.0.into(),
+                    width: 1.0,
+                    color: Color::from_rgb(0.15, 0.15, 0.15),
+                },
+                ..Default::default()
+            })
+            .into()
     }
 }
