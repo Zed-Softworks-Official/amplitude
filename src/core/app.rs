@@ -30,8 +30,11 @@ use crate::core::{
     modal::{Modal, modal}
 };
 
+use crate::pipewire::pw_core::PwCore;
+
 #[derive(Default)]
 pub struct App {
+    pw_core: PwCore,
     audio_manager: AudioManager,
     create_channel_modal: Modal<NewChannelData>,
     config: Config,
@@ -60,11 +63,12 @@ impl App {
         let config = Config::load();
 
         Self {
+            pw_core: PwCore::new(),
             audio_manager: AudioManager::new(config.clone()),
             create_channel_modal: Modal::new(NewChannelData {
                 name: "".to_string()
             }),
-            config
+            config,
         }
     }
 

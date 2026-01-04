@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use std::fs;
 use crate::audio::Channel;
+use crate::core::icon::Icon;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -13,7 +14,12 @@ pub struct Config {
 impl Config {
     fn new() -> Self {
         Self {
-            channels: Vec::new()
+            channels: vec![
+                Channel::new(
+                    "Microphone".to_string(),
+                    Icon::Microphone
+                )
+            ]
         }
     }
 

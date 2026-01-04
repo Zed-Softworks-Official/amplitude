@@ -5,12 +5,15 @@ use lucide_icons::iced::{
     icon_headphone_off,
     icon_wifi,
     icon_wifi_off,
-    icon_speaker
+    icon_speaker,
+    icon_mic
 };
 
 #[derive(Debug, PartialEq, Clone, Eq, Serialize, Deserialize)]
 pub enum Icon {
     Speaker,
+    Microphone,
+
     Monitor,
     MonitorMuted,
     Stream,
@@ -23,6 +26,7 @@ pub fn get_icon(icon: Icon) -> iced::widget::Text<'static> {
         Icon::Monitor => icon_headphones(),
         Icon::MonitorMuted => icon_headphone_off(),
         Icon::Stream => icon_wifi(),
-        Icon::StreamMuted => icon_wifi_off()
+        Icon::StreamMuted => icon_wifi_off(),
+        Icon::Microphone => icon_mic()
     }
 }

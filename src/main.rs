@@ -1,5 +1,6 @@
 mod core;
 mod audio;
+mod pipewire;
 
 use lucide_icons::LUCIDE_FONT_BYTES;
 use crate::core::app::App;
@@ -10,7 +11,8 @@ use iced::{
 };
 use iced::theme::Palette;
 
-fn main() -> iced::Result {
+#[tokio::main]
+async fn main() -> iced::Result {
     let settings = iced::Settings {
         fonts: vec![LUCIDE_FONT_BYTES.into()],
         ..Default::default()
