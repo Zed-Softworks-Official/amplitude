@@ -1,15 +1,17 @@
 use tokio::sync::mpsc;
+use log::{info, error};
 use std::thread;
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use pw::{main_loop::MainLoopRc, context::ContextRc};
 
 use crate::pipewire::pw_node::{PwNode, MediaClass};
 
-#[derive(Default)]
 pub struct PwCore {
     thread_handle: Option<thread::JoinHandle<()>>,
     command_sender: Option<pw::channel::Sender<PwCommand>>,
-    event_receiver: Option<mpsc::Receiver<PwEvent>>,
+    event_receiver: Arc<Mutex<mpsc::Receiver<PwEvent>>>,
+    nodes: Arc<Mutex<HashMap<u32, PwNode>>>,
 }
 
 // Commands Sent FROM tokio TO pipewire
@@ -18,6 +20,7 @@ pub enum PwCommand {
 }
 
 // Events sent FROM pipewire TO tokio
+#[derive(Debug, Clone)]
 pub enum PwEvent {
     NodeAdded(PwNode),
     NodeRemoved(u32),
@@ -35,7 +38,8 @@ impl PwCore {
         Self {
             thread_handle: Some(thread_handle),
             command_sender: Some(pw_sender),
-            event_receiver: Some(event_receiver),
+            event_receiver: Arc::new(Mutex::new(event_receiver)),
+            nodes: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -45,8 +49,22 @@ impl PwCore {
         }
     }
 
-    pub fn try_recv(&mut self) -> Option<PwEvent> {
-        self.event_receiver.as_mut()?.try_recv().ok()
+    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
+        Arc::clone(&self.event_receiver)
+    }
+
+    pub fn process_events(&self) {
+        let mut receiver = self.event_receiver.lock().unwrap();
+        while let Ok(event) = receiver.try_recv() {
+            match event {
+                PwEvent::NodeAdded(node) => {
+                    self.nodes.lock().unwrap().insert(node.id, node);
+                },
+                PwEvent::NodeRemoved(id) => {
+                    self.nodes.lock().unwrap().remove(&id);
+                }
+            }
+        }
     }
 }
 
@@ -59,7 +77,7 @@ fn pw_thread(
     let mainloop = match MainLoopRc::new(None) {
         Ok(mainloop) => mainloop,
         Err(err) => {
-            eprintln!("Failed to create main loop: {}", err);
+            error!("Failed to create main loop: {}", err);
             return;
         }
     };
@@ -67,7 +85,7 @@ fn pw_thread(
     let context = match ContextRc::new(&mainloop, None) {
         Ok(context) => context,
         Err(err) => {
-            eprintln!("Failed to create context: {}", err);
+            error!("Failed to create context: {}", err);
             return;
         }
     };
@@ -75,7 +93,7 @@ fn pw_thread(
     let core = match context.connect_rc(None) {
         Ok(core) => core,
         Err(err) => {
-            eprintln!("Failed to connect to context: {}", err);
+            error!("Failed to connect to context: {}", err);
             return;
         }
     };
@@ -83,11 +101,15 @@ fn pw_thread(
     let registry = match core.get_registry() {
         Ok(registry) => registry,
         Err(err) => {
-            eprintln!("Failed to get registry: {}", err);
+            error!("Failed to get registry: {}", err);
             return;
         }
     };
 
+    let sender_add = main_sender.clone();
+    let sender_remove = main_sender;
+
+    // Listen for new nodes
     let _listener = registry.add_listener_local()
         .global(move |global| {
             if global.type_ != pw::types::ObjectType::Node {
@@ -109,9 +131,24 @@ fn pw_thread(
                 return;
             }
 
-            println!("Node Added: {:?}", node);
+            let _ = sender_add.blocking_send(PwEvent::NodeAdded(node));
+        })
+        .global_remove(move |id| {
+            let _ = sender_remove.blocking_send(PwEvent::NodeRemoved(id));
         })
         .register();
 
-    mainloop.run();
+    // Handle commands from the app
+    let mainloop_weak = mainloop.downgrade();
+    let _receiver = pw_receiver.attach(mainloop.loop_(), move |cmd| {
+        match cmd {
+            PwCommand::Terminate => {
+                if let Some(mainloop) = mainloop_weak.upgrade() {
+                    mainloop.quit();
+                }
+            }
+        }
+    });
+
+   mainloop.run();
 }

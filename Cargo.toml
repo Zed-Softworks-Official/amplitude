@@ -5,10 +5,13 @@ edition = "2024"
 
 [dependencies]
 dirs = "6.0.0"
-iced = { version = "0.14.0", features = ["canvas"] }
+futures = "0.3"
+iced = { version = "0.14.0", features = ["canvas", "tokio"] }
 lucide-icons = { version = "0.562.0", features= ["iced"] }
 serde = { version = "1.0.183", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 toml = "0.9.10"
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
 pw = { version = "0.9.2", package = "pipewire" }
+log = "0.4.29"
+env_logger = "0.11.8"

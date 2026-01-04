@@ -10,15 +10,18 @@ use iced::{
     Color,
 };
 use iced::theme::Palette;
+use env_logger::Env;
 
-#[tokio::main]
-async fn main() -> iced::Result {
+fn main() -> iced::Result {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
     let settings = iced::Settings {
         fonts: vec![LUCIDE_FONT_BYTES.into()],
         ..Default::default()
     };
 
     iced::application(App::new, App::update, App::view)
+        .subscription(App::subscription)
         .theme(theme())
         .settings(settings)
         .title("Amplitude")

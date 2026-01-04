@@ -1,5 +1,9 @@
 use uuid::Uuid;
+use std::time::Duration;
+use std::sync::Arc;
+use log::info;
 use lucide_icons::iced::icon_plus;
+use futures::SinkExt;
 
 use iced::widget::{
     button,
@@ -30,9 +34,9 @@ use crate::core::{
     modal::{Modal, modal}
 };
 
-use crate::pipewire::pw_core::PwCore;
+use crate::pipewire::pw_core::{PwCore, PwEvent};
 
-#[derive(Default)]
+
 pub struct App {
     pw_core: PwCore,
     audio_manager: AudioManager,
@@ -52,6 +56,9 @@ pub enum Message {
     MonitorMuteToggled(Uuid),
     StreamMuteToggled(Uuid),
 
+    // PipeWire
+    PipeWireEvent(PwEvent),
+
     // Modal
     ShowModal,
     HideModal,
@@ -59,6 +66,10 @@ pub enum Message {
 }
 
 impl App {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
+        pw_event_subscription(self.pw_core.get_event_receiver())
+    }
+
     pub fn new() -> Self {
         let config = Config::load();
 
@@ -92,24 +103,31 @@ impl App {
                 self.config.save(Some(self.audio_manager.get_channels().clone()));
             },
             Message::MonitorVolumeChanged(uuid, volume) => {
-                println!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
+                info!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
                 self.audio_manager.update_volume(uuid, volume, ChannelBus::Monitor);
             },
             Message::StreamVolumeChanged(uuid, volume) => {
-                println!("Stream Volume Changed: {} (uuid: {})", volume, uuid);
+                info!("Stream Volume Changed: {} (uuid: {})", volume, uuid);
                 self.audio_manager.update_volume(uuid, volume, ChannelBus::Stream);
             }
             Message::MonitorMuteToggled(uuid) => {
-                println!("Monitor Mute Toggled");
+                info!("Monitor Mute Toggled: {}", uuid);
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Monitor);
             },
             Message::StreamMuteToggled(uuid) => {
-                println!("Stream Mute Toggled");
+                info!("Stream Mute Toggled: {}", uuid);
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
+            }
+            Message::PipeWireEvent(event) => {
+                self.pw_core.process_events();
+                info!("PipeWire Event: {:?}", event);
+                // TODO: Actually Do Things
+                // Handle the event - you can add your logic here
+                // For example, update UI state based on node additions/removals
             }
             Message::NewChannelContentChanged(content) => {
                 self.create_channel_modal.data.as_mut().unwrap().name = content;
-            }
+            },
         };
     }
 
@@ -211,3 +229,48 @@ impl App {
             .into()
     }
 }
+
+// Subscription for PipeWire events
+#[derive(Clone)]
+struct PwEventReceiver(Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>);
+
+impl std::hash::Hash for PwEventReceiver {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::hash(&*self.0, state);
+    }
+}
+
+fn pw_event_subscription(
+    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>
+) -> iced::Subscription<Message> {
+    iced::Subscription::run_with(
+        PwEventReceiver(receiver),
+        pw_event_worker
+    )
+}
+
+fn pw_event_worker(
+    receiver_wrapper: &PwEventReceiver
+) -> iced::futures::stream::BoxStream<'static, Message> {
+    let receiver = Arc::clone(&receiver_wrapper.0);
+
+    Box::pin(iced::stream::channel(100, move |mut output: futures::channel::mpsc::Sender<Message>| {
+        let receiver = Arc::clone(&receiver);
+        async move {
+            loop {
+                // Try to receive events from PipeWire
+                let event = {
+                    let mut rx = receiver.lock().unwrap();
+                    rx.try_recv().ok()
+                };
+
+                if let Some(event) = event {
+                    let _ = output.send(Message::PipeWireEvent(event)).await;
+                }
+
+                tokio::time::sleep(Duration::from_millis(16)).await;
+            }
+        }
+    }))
+}
+
