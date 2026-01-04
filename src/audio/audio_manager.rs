@@ -1,5 +1,7 @@
 use uuid::Uuid;
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use tokio::sync::mpsc;
 
 use crate::audio::{
     channel_manager::ChannelManager,
@@ -8,6 +10,10 @@ use crate::audio::{
 };
 
 use crate::core::config::Config;
+use crate::pipewire::{
+    pw_node::PwNode,
+    pw_core::{PwCore, PwEvent}
+};
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
@@ -15,14 +21,14 @@ pub enum ChannelBus {
     Stream
 }
 
-#[derive(Default, Debug, Clone)]
 pub struct AudioManager {
+    pw_core: PwCore,
     channel_manager: ChannelManager,
     buses: HashMap<ChannelBus, Bus>
 }
 
 impl AudioManager {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, pw_core: PwCore) -> Self {
         let buses = HashMap::from(
             [
 
@@ -31,9 +37,11 @@ impl AudioManager {
             ]);
 
         let channel_manager = ChannelManager::new(config);
+
         Self {
             channel_manager,
-            buses
+            buses,
+            pw_core
         }
     }
 
@@ -64,5 +72,17 @@ impl AudioManager {
 
     pub fn get_busses(&self) -> &HashMap<ChannelBus, Bus> {
         &self.buses
+    }
+
+    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
+        self.pw_core.get_event_receiver()
+    }
+
+    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
+        self.pw_core.get_nodes()
+    }
+
+    pub fn process_events(&self) {
+        self.pw_core.process_events();
     }
 }

@@ -1,8 +1,10 @@
 use tokio::sync::mpsc;
-use log::{info, error};
+use log::error;
+
 use std::thread;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+
 use pw::{main_loop::MainLoopRc, context::ContextRc};
 
 use crate::pipewire::pw_node::{PwNode, MediaClass};
@@ -65,6 +67,10 @@ impl PwCore {
                 }
             }
         }
+    }
+
+    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
+        self.nodes.lock().unwrap().clone()
     }
 }
 

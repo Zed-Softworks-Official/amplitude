@@ -38,10 +38,10 @@ use crate::pipewire::pw_core::{PwCore, PwEvent};
 
 
 pub struct App {
-    pw_core: PwCore,
     audio_manager: AudioManager,
-    create_channel_modal: Modal<NewChannelData>,
     config: Config,
+
+    create_channel_modal: Modal<NewChannelData>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,36 +59,38 @@ pub enum Message {
     // PipeWire
     PipeWireEvent(PwEvent),
 
-    // Modal
-    ShowModal,
-    HideModal,
-    NewChannelContentChanged(String)
+    // Create Channel Modal
+    ShowCreateChannelModal,
+    HideCreateChannelModal,
+    NewChannelContentChanged(String),
+
+    // App Names Modal
+    ShowAppNamesModal(Uuid),
 }
 
 impl App {
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        pw_event_subscription(self.pw_core.get_event_receiver())
+        pw_event_subscription(self.audio_manager.get_event_receiver())
     }
 
     pub fn new() -> Self {
         let config = Config::load();
 
         Self {
-            pw_core: PwCore::new(),
-            audio_manager: AudioManager::new(config.clone()),
+            audio_manager: AudioManager::new(config.clone(), PwCore::new()),
+            config,
             create_channel_modal: Modal::new(NewChannelData {
                 name: "".to_string()
             }),
-            config,
         }
     }
 
     pub fn update(&mut self, msg: Message) {
         match msg {
-            Message::ShowModal => {
+            Message::ShowCreateChannelModal => {
                 self.create_channel_modal.show();
             },
-            Message::HideModal => {
+            Message::HideCreateChannelModal => {
                 self.create_channel_modal.hide();
             },
             Message::AddChannel => {
@@ -119,14 +121,18 @@ impl App {
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
             Message::PipeWireEvent(event) => {
-                self.pw_core.process_events();
+                self.audio_manager.process_events();
                 info!("PipeWire Event: {:?}", event);
+
                 // TODO: Actually Do Things
                 // Handle the event - you can add your logic here
                 // For example, update UI state based on node additions/removals
             }
             Message::NewChannelContentChanged(content) => {
                 self.create_channel_modal.data.as_mut().unwrap().name = content;
+            },
+            Message::ShowAppNamesModal(uuid) => {
+                info!("Show App Names Modal: {}", uuid);
             },
         };
     }
@@ -144,7 +150,7 @@ impl App {
             .align_y(Alignment::Center);
 
         let add_channel_button = button(button_content)
-            .on_press(Message::ShowModal)
+            .on_press(Message::ShowCreateChannelModal)
             .width(Length::Fixed(100.0))
             .height(Length::Fill)
             .style(|theme: &Theme, status| {
@@ -194,7 +200,7 @@ impl App {
             .spacing(20);
 
         if self.create_channel_modal.show_modal {
-            modal(interface, self.new_channel_modal(), Message::HideModal)
+            modal(interface, self.new_channel_modal(), Message::HideCreateChannelModal)
         } else {
             interface.into()
         }
@@ -212,7 +218,7 @@ impl App {
             row![
                 container(
                     button(text("Cancel"))
-                        .on_press(Message::HideModal)
+                        .on_press(Message::HideCreateChannelModal)
                         .style(button::danger)
                 ).align_left(iced::Fill),
                 container(
@@ -222,6 +228,27 @@ impl App {
 
                 ).align_right(iced::Fill),
             ].width(Length::Fill)
+        ].spacing(10))
+            .padding(padding::vertical(10).horizontal(20))
+            .style(container::rounded_box)
+            .max_width(400)
+            .into()
+    }
+
+    fn app_names_modal(&self, uuid: Uuid) -> iced::Element<'_, Message> {
+        let channel = self.audio_manager.get_channels().get(&uuid).clone();
+        let nodes = self.audio_manager.get_nodes();
+
+        container(column![
+            text("Routing to this channel").center(),
+            text(channel.as_ref().unwrap().app_names.join(", ")),
+            text("Souces not routed to this channel").center(),
+            row(
+                nodes
+                    .iter()
+                    .filter(|(_id, node)| node.media_class.is_input())
+                    .map(|(_id, node)| text(node.name.clone()).into())
+            ).spacing(10),
         ].spacing(10))
             .padding(padding::vertical(10).horizontal(20))
             .style(container::rounded_box)

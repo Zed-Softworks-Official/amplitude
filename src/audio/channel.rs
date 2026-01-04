@@ -26,7 +26,8 @@ use iced::{
     Background,
     Color,
     Border,
-    Alignment
+    Alignment,
+    Length,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +36,7 @@ pub struct Channel {
     pub id: Uuid,
     pub icon: Icon,
     pub channel_name: String,
+    pub app_names: Vec<String>,
     pub monitor_bus_options: BusOptions,
     pub stream_bus_options: BusOptions
 }
@@ -47,6 +49,7 @@ impl Channel {
         Self {
             id: Uuid::new_v4(),
             channel_name,
+            app_names: Vec::new(),
             icon,
             monitor_bus_options: BusOptions::new(0.8, false),
             stream_bus_options: BusOptions::new(0.8, false),
@@ -58,8 +61,15 @@ impl Channel {
             id: channel.id,
             channel_name: channel.channel_name.to_string(),
             icon: channel.icon.clone(),
-            monitor_bus_options: BusOptions::new(channel.monitor_bus_options.volume, channel.monitor_bus_options.muted),
-            stream_bus_options: BusOptions::new(channel.stream_bus_options.volume, channel.stream_bus_options.muted),
+            app_names: channel.app_names.clone(),
+            monitor_bus_options: BusOptions::new(
+                channel.monitor_bus_options.volume,
+                channel.monitor_bus_options.muted
+            ),
+            stream_bus_options: BusOptions::new(
+                channel.stream_bus_options.volume,
+                channel.stream_bus_options.muted
+            ),
         }
     }
 
@@ -97,12 +107,17 @@ impl Channel {
             ].spacing(20)
         ].spacing(10));
 
+        let app_names_button = button(text("Apps").center())
+            .on_press(Message::ShowAppNamesModal(self.id))
+            .width(Length::Fill);
+
         container(
             column![
                 row![
                     get_icon(self.icon.clone()),
                     channel_name
                 ].spacing(10),
+                app_names_button,
                 progress_bar(0.0..=1.0, self.monitor_bus_options.level),
                 sliders
             ].spacing(10))
