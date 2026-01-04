@@ -3,6 +3,7 @@ mod channel;
 mod bus;
 
 pub mod audio_manager;
-pub use channel::NewChannelData;
+
+pub use channel::{NewChannelData, Channel};
 
 

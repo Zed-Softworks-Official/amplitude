@@ -7,6 +7,8 @@ use crate::audio::{
     channel::Channel
 };
 
+use crate::core::config::Config;
+
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
     Monitor,
@@ -20,7 +22,7 @@ pub struct AudioManager {
 }
 
 impl AudioManager {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         let buses = HashMap::from(
             [
 
@@ -28,8 +30,9 @@ impl AudioManager {
                 (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
             ]);
 
+        let channel_manager = ChannelManager::new(config);
         Self {
-            channel_manager: ChannelManager::new(),
+            channel_manager,
             buses
         }
     }

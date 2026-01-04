@@ -1,4 +1,5 @@
 use crate::core::app::Message;
+use serde::{Serialize, Deserialize};
 
 use iced::widget::{
     text,
@@ -58,7 +59,7 @@ impl Bus {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BusOptions {
     pub volume: f32, // Volume for slider
     pub level: f32, // Level for vu meter

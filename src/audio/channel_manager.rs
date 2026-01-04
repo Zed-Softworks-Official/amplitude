@@ -1,9 +1,15 @@
 use uuid::Uuid;
 use std::collections::HashMap;
 
-use crate::audio::channel::Channel;
-use crate::audio::audio_manager::ChannelBus;
-use lucide_icons::iced::icon_speaker;
+use crate::audio::{
+    channel::Channel,
+    audio_manager::ChannelBus
+};
+
+use crate::core::{
+    config::Config,
+    icon::Icon
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct ChannelManager {
@@ -11,14 +17,25 @@ pub struct ChannelManager {
 }
 
 impl ChannelManager {
-    pub fn new() -> Self {
-        ChannelManager {
+    pub fn new(config: Config) -> Self {
+        if config.channels.len() > 0 {
+            let mut channels = HashMap::new();
+            for channel in &config.channels {
+                channels.insert(channel.id, Channel::from_config(channel));
+            }
+
+            return Self {
+                channels
+            };
+        }
+
+        Self {
             channels: HashMap::new()
         }
     }
 
     pub fn add_channel(&mut self, name: &str) -> Uuid {
-        let channel = Channel::new(name.to_string(), icon_speaker);
+        let channel = Channel::new(name.to_string(), Icon::Speaker);
         self.channels.insert(channel.id, channel.clone());
 
         channel.id

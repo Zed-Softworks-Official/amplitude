@@ -1,10 +1,17 @@
 use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 
-use crate::core::app::Message;
-use crate::audio::bus::{BusOptions};
+use crate::core::{
+    app::Message,
+    icon::{
+        Icon,
+        get_icon
+    },
+};
+
+use crate::audio::bus::BusOptions;
 
 use iced::widget::{
-    Text,
     text,
     container,
     column,
@@ -22,15 +29,11 @@ use iced::{
     Alignment
 };
 
-use lucide_icons::iced::{
-    icon_headphones,
-    icon_podcast
-};
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
+    #[serde(with = "uuid::serde::compact")]
     pub id: Uuid,
-    pub icon: fn() -> Text<'static>,
+    pub icon: Icon,
     pub channel_name: String,
     pub monitor_bus_options: BusOptions,
     pub stream_bus_options: BusOptions
@@ -39,14 +42,24 @@ pub struct Channel {
 impl Channel {
     pub fn new(
         channel_name: String,
-        icon: fn() -> iced::widget::Text<'static>
+        icon: Icon
     ) -> Self {
-        Channel {
+        Self {
             id: Uuid::new_v4(),
             channel_name,
             icon,
             monitor_bus_options: BusOptions::new(0.8, false),
             stream_bus_options: BusOptions::new(0.8, false),
+        }
+    }
+
+    pub fn from_config(channel: &Channel) -> Self {
+        Self {
+            id: channel.id,
+            channel_name: channel.channel_name.to_string(),
+            icon: channel.icon.clone(),
+            monitor_bus_options: BusOptions::new(channel.monitor_bus_options.volume, channel.monitor_bus_options.muted),
+            stream_bus_options: BusOptions::new(channel.stream_bus_options.volume, channel.stream_bus_options.muted),
         }
     }
 
@@ -60,7 +73,7 @@ impl Channel {
                     self.monitor_bus_options.volume,
                     |v| Message::MonitorVolumeChanged(self.id, v)
                 ).step(0.1),
-                icon_headphones().size(20),
+                get_icon(Icon::Monitor).size(20),
                 button(text("Mute"))
                     .on_press(Message::MonitorMuteToggled(self.id))
                     .style(match self.monitor_bus_options.muted {
@@ -74,7 +87,7 @@ impl Channel {
                     self.stream_bus_options.volume,
                     |v| Message::StreamVolumeChanged(self.id, v)
                 ).step(0.1),
-                icon_podcast().size(20),
+                get_icon(Icon::Stream).size(20),
                 button(text("Mute"))
                     .on_press(Message::StreamMuteToggled(self.id))
                     .style(match self.stream_bus_options.muted {
@@ -87,7 +100,7 @@ impl Channel {
         container(
             column![
                 row![
-                    (self.icon)(),
+                    get_icon(self.icon.clone()),
                     channel_name
                 ].spacing(10),
                 progress_bar(0.0..=1.0, self.monitor_bus_options.level),

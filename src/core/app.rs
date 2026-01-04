@@ -20,14 +20,21 @@ use iced::{
     Border,
 };
 
-use crate::audio::audio_manager::{AudioManager, ChannelBus};
-use crate::audio::NewChannelData;
-use crate::core::modal::{Modal, modal};
+use crate::audio::{
+    NewChannelData,
+    audio_manager::{AudioManager, ChannelBus}
+};
+
+use crate::core::{
+    config::Config,
+    modal::{Modal, modal}
+};
 
 #[derive(Default)]
 pub struct App {
     audio_manager: AudioManager,
     create_channel_modal: Modal<NewChannelData>,
+    config: Config,
 }
 
 #[derive(Debug, Clone)]
@@ -50,11 +57,14 @@ pub enum Message {
 
 impl App {
     pub fn new() -> Self {
+        let config = Config::load();
+
         Self {
-            audio_manager: AudioManager::new(),
+            audio_manager: AudioManager::new(config.clone()),
             create_channel_modal: Modal::new(NewChannelData {
                 name: "".to_string()
-            })
+            }),
+            config
         }
     }
 
@@ -74,6 +84,8 @@ impl App {
                         .name
                         .as_str()
                 );
+
+                self.config.save(Some(self.audio_manager.get_channels().clone()));
             },
             Message::MonitorVolumeChanged(uuid, volume) => {
                 println!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
