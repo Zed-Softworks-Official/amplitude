@@ -26,16 +26,15 @@ use iced::{
 
 use crate::audio::{
     NewChannelData,
-    audio_manager::{AudioManager, ChannelBus}
+    audio_manager::{AudioManager, ChannelBus},
+    backend::{AudioBackend, BackendCommand, AudioEvent}
 };
+
 
 use crate::core::{
     config::Config,
     modal::{Modal, modal}
 };
-
-use crate::pipewire::pw_core::{PwCore, PwEvent};
-
 
 pub struct App {
     audio_manager: AudioManager,
@@ -56,8 +55,8 @@ pub enum Message {
     MonitorMuteToggled(Uuid),
     StreamMuteToggled(Uuid),
 
-    // PipeWire
-    PipeWireEvent(PwEvent),
+    // AudioBackend
+    AudioBackendEvent(AudioEvent),
 
     // Create Channel Modal
     ShowCreateChannelModal,
@@ -70,14 +69,14 @@ pub enum Message {
 
 impl App {
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        pw_event_subscription(self.audio_manager.get_event_receiver())
+        backend_event_subscription(self.audio_manager.get_event_receiver())
     }
 
     pub fn new() -> Self {
         let config = Config::load();
 
         Self {
-            audio_manager: AudioManager::new(config.clone(), PwCore::new()),
+            audio_manager: AudioManager::new(config.clone(), create_backend()),
             config,
             create_channel_modal: Modal::new(NewChannelData {
                 name: "".to_string()
@@ -120,9 +119,9 @@ impl App {
                 info!("Stream Mute Toggled: {}", uuid);
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
-            Message::PipeWireEvent(event) => {
+            Message::AudioBackendEvent(event) => {
                 self.audio_manager.process_events();
-                info!("PipeWire Event: {:?}", event);
+                info!("Audio Backend Event: {:?}", event);
 
                 // TODO: Actually Do Things
                 // Handle the event - you can add your logic here
@@ -257,27 +256,27 @@ impl App {
     }
 }
 
-// Subscription for PipeWire events
+// Subscription for Audio events
 #[derive(Clone)]
-struct PwEventReceiver(Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>);
+struct BackendEventReceiver(Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>);
 
-impl std::hash::Hash for PwEventReceiver {
+impl std::hash::Hash for BackendEventReceiver {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::ptr::hash(&*self.0, state);
     }
 }
 
-fn pw_event_subscription(
-    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>
+fn backend_event_subscription(
+    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>
 ) -> iced::Subscription<Message> {
     iced::Subscription::run_with(
-        PwEventReceiver(receiver),
-        pw_event_worker
+        BackendEventReceiver(receiver),
+        backend_event_worker
     )
 }
 
-fn pw_event_worker(
-    receiver_wrapper: &PwEventReceiver
+fn backend_event_worker(
+    receiver_wrapper: &BackendEventReceiver
 ) -> iced::futures::stream::BoxStream<'static, Message> {
     let receiver = Arc::clone(&receiver_wrapper.0);
 
@@ -299,5 +298,16 @@ fn pw_event_worker(
             }
         }
     }))
+}
+
+// Create correct audio backend
+#[cfg(target_os = "linux")]
+fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(crate::platform::pipewire::PipewireBackend::new())
+}
+
+#[cfg(target_os = "macos")]
+fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(crate::platform::coreaudio::CoreAudioBackend::new())
 }
 

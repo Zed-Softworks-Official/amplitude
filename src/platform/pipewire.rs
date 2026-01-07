@@ -1,37 +1,29 @@
+use std::{
+    thread,
+    sync::{Arc, Mutex},
+    collections::HashMap
+};
+
+use crate::audio::backend::{
+    AudioBackend,
+    AudioEvent,
+    AudioNode,
+    BackendCommand,
+};
+
 use tokio::sync::mpsc;
-use log::error;
 
-use std::thread;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-
-use pw::{main_loop::MainLoopRc, context::ContextRc};
-
-use crate::pipewire::pw_node::{PwNode, MediaClass};
-
-pub struct PwCore {
+pub struct PipewireBackend {
     thread_handle: Option<thread::JoinHandle<()>>,
-    command_sender: Option<pw::channel::Sender<PwCommand>>,
-    event_receiver: Arc<Mutex<mpsc::Receiver<PwEvent>>>,
-    nodes: Arc<Mutex<HashMap<u32, PwNode>>>,
+    command_sender: Option<pw::channel::Sender<BackendCommand>>,
+    event_receiver: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
+    nodes: Arc<Mutex<HashMap<u32, AudioNode>>>,
 }
 
-// Commands Sent FROM tokio TO pipewire
-pub enum PwCommand {
-    Terminate,
-}
-
-// Events sent FROM pipewire TO tokio
-#[derive(Debug, Clone)]
-pub enum PwEvent {
-    NodeAdded(PwNode),
-    NodeRemoved(u32),
-}
-
-impl PwCore {
-    pub fn new() -> Self {
-        let (pw_sender, pw_receiver) = pw::channel::channel::<PwCommand>();
-        let (event_sender, event_receiver) = mpsc::channel::<PwEvent>(100);
+impl AudioBackend for PipewireBackend {
+    fn new() -> Self {
+        let (pw_sender, pw_receiver) = pw::channel::channel::<BackendCommand>();
+        let (event_sender, event_receiver) = mpsc::channel::<AudioEvent>(100);
 
         let thread_handle = thread::spawn(move || {
             pw_thread(event_sender, pw_receiver);
@@ -45,32 +37,14 @@ impl PwCore {
         }
     }
 
-    pub fn send_command(&self, cmd: PwCommand) {
+    fn send_command(&self, cmd: PwCommand) {
         if let Some(sender) = &self.command_sender {
             let _ = sender.send(cmd);
         }
     }
 
-    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
+    fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
         Arc::clone(&self.event_receiver)
-    }
-
-    pub fn process_events(&self) {
-        let mut receiver = self.event_receiver.lock().unwrap();
-        while let Ok(event) = receiver.try_recv() {
-            match event {
-                PwEvent::NodeAdded(node) => {
-                    self.nodes.lock().unwrap().insert(node.id, node);
-                },
-                PwEvent::NodeRemoved(id) => {
-                    self.nodes.lock().unwrap().remove(&id);
-                }
-            }
-        }
-    }
-
-    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
-        self.nodes.lock().unwrap().clone()
     }
 }
 

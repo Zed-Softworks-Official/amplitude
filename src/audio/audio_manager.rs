@@ -9,11 +9,12 @@ use crate::audio::{
     channel::Channel
 };
 
-use crate::core::config::Config;
-use crate::pipewire::{
-    pw_node::PwNode,
-    pw_core::{PwCore, PwEvent}
+use crate::audio::backend::{
+    AudioBackend,
+    AudioEvent,
+    AudioNode
 };
+use crate::core::config::Config;
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
@@ -22,13 +23,13 @@ pub enum ChannelBus {
 }
 
 pub struct AudioManager {
-    pw_core: PwCore,
+    audio_backend: Box<dyn AudioBackend>,
     channel_manager: ChannelManager,
     buses: HashMap<ChannelBus, Bus>
 }
 
 impl AudioManager {
-    pub fn new(config: Config, pw_core: PwCore) -> Self {
+    pub fn new(config: Config, audio_backend: Box<dyn AudioBackend>) -> Self {
         let buses = HashMap::from(
             [
 
@@ -41,7 +42,7 @@ impl AudioManager {
         Self {
             channel_manager,
             buses,
-            pw_core
+            audio_backend
         }
     }
 
@@ -74,15 +75,11 @@ impl AudioManager {
         &self.buses
     }
 
-    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
-        self.pw_core.get_event_receiver()
-    }
-
-    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
-        self.pw_core.get_nodes()
+    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
+        self.audio_backend.get_event_receiver()
     }
 
     pub fn process_events(&self) {
-        self.pw_core.process_events();
+        self.audio_backend.process_events();
     }
 }
