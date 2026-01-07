@@ -32,7 +32,6 @@ impl AudioManager {
     pub fn new(config: Config, audio_backend: Box<dyn AudioBackend>) -> Self {
         let buses = HashMap::from(
             [
-
                 (ChannelBus::Stream, Bus::new("Stream".to_string())),
                 (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
             ]);
@@ -65,6 +64,10 @@ impl AudioManager {
         bus: ChannelBus
     ) {
         self.channel_manager.toggle_mute(uuid, bus);
+    }
+
+    pub fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>> {
+        self.audio_backend.get_nodes()
     }
 
     pub fn get_channels(&self) -> &HashMap<Uuid, Channel> {

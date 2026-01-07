@@ -1,6 +1,7 @@
 use uuid::Uuid;
 use std::time::Duration;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use log::info;
 use lucide_icons::iced::icon_plus;
 use futures::SinkExt;
@@ -27,7 +28,7 @@ use iced::{
 use crate::audio::{
     NewChannelData,
     audio_manager::{AudioManager, ChannelBus},
-    backend::{AudioBackend, BackendCommand, AudioEvent}
+    backend::{AudioBackend, AudioEvent}
 };
 
 
@@ -55,7 +56,7 @@ pub enum Message {
     MonitorMuteToggled(Uuid),
     StreamMuteToggled(Uuid),
 
-    // AudioBackend
+    // Audio Backend
     AudioBackendEvent(AudioEvent),
 
     // Create Channel Modal
@@ -233,32 +234,11 @@ impl App {
             .max_width(400)
             .into()
     }
-
-    fn app_names_modal(&self, uuid: Uuid) -> iced::Element<'_, Message> {
-        let channel = self.audio_manager.get_channels().get(&uuid).clone();
-        let nodes = self.audio_manager.get_nodes();
-
-        container(column![
-            text("Routing to this channel").center(),
-            text(channel.as_ref().unwrap().app_names.join(", ")),
-            text("Souces not routed to this channel").center(),
-            row(
-                nodes
-                    .iter()
-                    .filter(|(_id, node)| node.media_class.is_input())
-                    .map(|(_id, node)| text(node.name.clone()).into())
-            ).spacing(10),
-        ].spacing(10))
-            .padding(padding::vertical(10).horizontal(20))
-            .style(container::rounded_box)
-            .max_width(400)
-            .into()
-    }
 }
 
 // Subscription for Audio events
 #[derive(Clone)]
-struct BackendEventReceiver(Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>);
+struct BackendEventReceiver(Arc<Mutex<mpsc::Receiver<AudioEvent>>>);
 
 impl std::hash::Hash for BackendEventReceiver {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -291,7 +271,7 @@ fn backend_event_worker(
                 };
 
                 if let Some(event) = event {
-                    let _ = output.send(Message::PipeWireEvent(event)).await;
+                    let _ = output.send(Message::AudioBackendEvent(event)).await;
                 }
 
                 tokio::time::sleep(Duration::from_millis(16)).await;
