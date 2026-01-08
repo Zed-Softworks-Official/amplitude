@@ -55,16 +55,13 @@ impl AudioBackend for PipewireBackend {
         Arc::clone(&self.event_receiver)
     }
 
-    fn process_events(&self) {
-        let mut receiver = self.event_receiver.lock().unwrap();
-        while let Ok(event) = receiver.try_recv() {
-            match event {
-                AudioEvent::NodeAdded(node) => {
-                    self.nodes.lock().unwrap().insert(node.id, node);
-                },
-                AudioEvent::NodeRemoved(id) => {
-                    self.nodes.lock().unwrap().remove(&id);
-                }
+    fn process_event(&self, event: AudioEvent) {
+        match event {
+            AudioEvent::NodeAdded(node) => {
+                self.nodes.lock().unwrap().insert(node.id, node);
+            },
+            AudioEvent::NodeRemoved(id) => {
+                self.nodes.lock().unwrap().remove(&id);
             }
         }
     }

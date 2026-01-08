@@ -6,7 +6,7 @@ pub trait AudioBackend {
     fn new() -> Self where Self: Sized;
     fn send_command(&self, cmd: BackendCommand);
     fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>>;
-    fn process_events(&self);
+    fn process_event(&self, event: AudioEvent);
     fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>>;
 }
 
@@ -35,8 +35,8 @@ pub struct AudioNode {
     pub format: Option<String>
 }
 
-#[cfg(target_os = "linux")]
 impl AudioNode {
+    #[cfg(target_os = "linux")]
     pub fn from_props(id: u32, props: &HashMap<String, String>) -> Self {
         let name = props.get("name").cloned().unwrap_or_default();
         let nick = props.get("nick").cloned();
@@ -101,8 +101,8 @@ pub enum MediaClass {
     Unknown
 }
 
-#[cfg(target_os = "linux")]
 impl MediaClass {
+    #[cfg(target_os = "linux")]
     pub fn from_str(class: &str) -> Self {
         match class {
             "Audio/Sink" => MediaClass::AudioSink,
@@ -113,3 +113,4 @@ impl MediaClass {
         }
     }
 }
+

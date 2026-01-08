@@ -121,12 +121,11 @@ impl App {
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
             Message::AudioBackendEvent(event) => {
-                self.audio_manager.process_events();
                 info!("Audio Backend Event: {:?}", event);
-
-                // TODO: Actually Do Things
-                // Handle the event - you can add your logic here
-                // For example, update UI state based on node additions/removals
+                // Pass the event directly to the backend for state updates.
+                // The subscription worker already consumed the event from the channel,
+                // so we pass it through rather than re-polling an empty channel.
+                self.audio_manager.process_event(event);
             }
             Message::NewChannelContentChanged(content) => {
                 self.create_channel_modal.data.as_mut().unwrap().name = content;
@@ -291,3 +290,9 @@ fn create_backend() -> Box<dyn AudioBackend> {
     Box::new(crate::platform::coreaudio::CoreAudioBackend::new())
 }
 
+#[cfg(target_os = "windows")]
+compile_error!("Windows is not yet supported");
+//Box::new(crate::platform::wasapi::WasapiBackend::new())
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+compile_error!("Unsupported platform");

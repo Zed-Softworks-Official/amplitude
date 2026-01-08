@@ -82,7 +82,7 @@ impl AudioManager {
         self.audio_backend.get_event_receiver()
     }
 
-    pub fn process_events(&self) {
-        self.audio_backend.process_events();
+    pub fn process_event(&self, event: AudioEvent) {
+        self.audio_backend.process_event(event);
     }
 }

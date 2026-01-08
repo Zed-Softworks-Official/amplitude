@@ -1,37 +1,68 @@
 use crate::audio::backend::{
     AudioBackend,
     BackendCommand,
-    AudioEvent
+    AudioEvent,
+    AudioNode,
 };
 
+use std::collections::HashMap;
+use std::thread;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use std::thread;
 
 pub struct CoreAudioBackend {
     thread_handle: Option<thread::JoinHandle<()>>,
-    command_sender: Option<String>,
+    command_sender: Option<mpsc::Sender<BackendCommand>>,
     event_receiver: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
+    nodes: Arc<Mutex<HashMap<u32, AudioNode>>>,
 }
 
 impl AudioBackend for CoreAudioBackend {
     fn new() -> Self {
-        let (_event_sender, event_receiver) = mpsc::channel::<AudioEvent>(100);
+        let (command_sender, command_receiver) = mpsc::channel::<BackendCommand>(100);
+        let (event_sender, event_receiver) = mpsc::channel::<AudioEvent>(100);
+
+        let thread_handle = thread::spawn(move || {
+            coreaudio_thread(event_sender, command_receiver);
+        });
 
         Self {
-            thread_handle: None,
-            command_sender: None,
+            thread_handle: Some(thread_handle),
+            command_sender: Some(command_sender),
             event_receiver: Arc::new(Mutex::new(event_receiver)),
+            nodes: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     fn send_command(&self, cmd: BackendCommand) {
+        if let Some(sender) = &self.command_sender {
+            let _ = sender.send(cmd);
+        }
     }
 
     fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
         self.event_receiver.clone()
     }
 
-    fn process_events(&self) {
+    fn process_event(&self, event: AudioEvent) {
+        match event {
+            AudioEvent::NodeAdded(node) => {
+                self.nodes.lock().unwrap().insert(node.id, node);
+            },
+            AudioEvent::NodeRemoved(id) => {
+                self.nodes.lock().unwrap().remove(&id);
+            }
+        }
     }
+
+    fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>> {
+        Arc::clone(&self.nodes)
+    }
+}
+
+fn coreaudio_thread(
+    main_sender: mpsc::Sender<AudioEvent>,
+    command_receiver: mpsc::Receiver<BackendCommand>
+) {
+    log::info!("CoreAudio backend thread started");
 }
