@@ -1,6 +1,6 @@
 mod core;
 mod audio;
-mod pipewire;
+mod platform;
 
 use lucide_icons::LUCIDE_FONT_BYTES;
 use crate::core::app::App;

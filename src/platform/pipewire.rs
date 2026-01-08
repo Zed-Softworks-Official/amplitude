@@ -1,37 +1,37 @@
-use tokio::sync::mpsc;
+use std::{
+    thread,
+    sync::{Arc, Mutex},
+    collections::HashMap
+};
+
 use log::error;
 
-use std::thread;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use pw::{
+    main_loop::MainLoopRc,
+    context::ContextRc,
+};
 
-use pw::{main_loop::MainLoopRc, context::ContextRc};
+use crate::audio::backend::{
+    AudioBackend,
+    AudioEvent,
+    AudioNode,
+    BackendCommand,
+    MediaClass,
+};
 
-use crate::pipewire::pw_node::{PwNode, MediaClass};
+use tokio::sync::mpsc;
 
-pub struct PwCore {
+pub struct PipewireBackend {
     thread_handle: Option<thread::JoinHandle<()>>,
-    command_sender: Option<pw::channel::Sender<PwCommand>>,
-    event_receiver: Arc<Mutex<mpsc::Receiver<PwEvent>>>,
-    nodes: Arc<Mutex<HashMap<u32, PwNode>>>,
+    command_sender: Option<pw::channel::Sender<BackendCommand>>,
+    event_receiver: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
+    nodes: Arc<Mutex<HashMap<u32, AudioNode>>>,
 }
 
-// Commands Sent FROM tokio TO pipewire
-pub enum PwCommand {
-    Terminate,
-}
-
-// Events sent FROM pipewire TO tokio
-#[derive(Debug, Clone)]
-pub enum PwEvent {
-    NodeAdded(PwNode),
-    NodeRemoved(u32),
-}
-
-impl PwCore {
-    pub fn new() -> Self {
-        let (pw_sender, pw_receiver) = pw::channel::channel::<PwCommand>();
-        let (event_sender, event_receiver) = mpsc::channel::<PwEvent>(100);
+impl AudioBackend for PipewireBackend {
+    fn new() -> Self {
+        let (pw_sender, pw_receiver) = pw::channel::channel::<BackendCommand>();
+        let (event_sender, event_receiver) = mpsc::channel::<AudioEvent>(100);
 
         let thread_handle = thread::spawn(move || {
             pw_thread(event_sender, pw_receiver);
@@ -45,38 +45,35 @@ impl PwCore {
         }
     }
 
-    pub fn send_command(&self, cmd: PwCommand) {
+    fn send_command(&self, cmd: BackendCommand) {
         if let Some(sender) = &self.command_sender {
             let _ = sender.send(cmd);
         }
     }
 
-    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
+    fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
         Arc::clone(&self.event_receiver)
     }
 
-    pub fn process_events(&self) {
-        let mut receiver = self.event_receiver.lock().unwrap();
-        while let Ok(event) = receiver.try_recv() {
-            match event {
-                PwEvent::NodeAdded(node) => {
-                    self.nodes.lock().unwrap().insert(node.id, node);
-                },
-                PwEvent::NodeRemoved(id) => {
-                    self.nodes.lock().unwrap().remove(&id);
-                }
+    fn process_event(&self, event: AudioEvent) {
+        match event {
+            AudioEvent::NodeAdded(node) => {
+                self.nodes.lock().unwrap().insert(node.id, node);
+            },
+            AudioEvent::NodeRemoved(id) => {
+                self.nodes.lock().unwrap().remove(&id);
             }
         }
     }
 
-    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
-        self.nodes.lock().unwrap().clone()
+    fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>> {
+        Arc::clone(&self.nodes)
     }
 }
 
 fn pw_thread(
-    main_sender: mpsc::Sender<PwEvent>,
-    pw_receiver: pw::channel::Receiver<PwCommand>
+    main_sender: mpsc::Sender<AudioEvent>,
+    pw_receiver: pw::channel::Receiver<BackendCommand>
 ) {
     pw::init();
 
@@ -132,15 +129,15 @@ fn pw_thread(
                 })
                 .unwrap_or_default();
 
-            let node = PwNode::from_props(global.id, &props);
+            let node = AudioNode::from_props(global.id, &props);
             if node.media_class == MediaClass::Unknown {
                 return;
             }
 
-            let _ = sender_add.blocking_send(PwEvent::NodeAdded(node));
+            let _ = sender_add.blocking_send(AudioEvent::NodeAdded(node));
         })
         .global_remove(move |id| {
-            let _ = sender_remove.blocking_send(PwEvent::NodeRemoved(id));
+            let _ = sender_remove.blocking_send(AudioEvent::NodeRemoved(id));
         })
         .register();
 
@@ -148,7 +145,7 @@ fn pw_thread(
     let mainloop_weak = mainloop.downgrade();
     let _receiver = pw_receiver.attach(mainloop.loop_(), move |cmd| {
         match cmd {
-            PwCommand::Terminate => {
+            BackendCommand::Terminate => {
                 if let Some(mainloop) = mainloop_weak.upgrade() {
                     mainloop.quit();
                 }
