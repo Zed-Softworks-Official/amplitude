@@ -9,11 +9,12 @@ use crate::audio::{
     channel::Channel
 };
 
-use crate::core::config::Config;
-use crate::pipewire::{
-    pw_node::PwNode,
-    pw_core::{PwCore, PwEvent}
+use crate::audio::backend::{
+    AudioBackend,
+    AudioEvent,
+    AudioNode
 };
+use crate::core::config::Config;
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
@@ -22,16 +23,15 @@ pub enum ChannelBus {
 }
 
 pub struct AudioManager {
-    pw_core: PwCore,
+    audio_backend: Box<dyn AudioBackend>,
     channel_manager: ChannelManager,
     buses: HashMap<ChannelBus, Bus>
 }
 
 impl AudioManager {
-    pub fn new(config: Config, pw_core: PwCore) -> Self {
+    pub fn new(config: Config, audio_backend: Box<dyn AudioBackend>) -> Self {
         let buses = HashMap::from(
             [
-
                 (ChannelBus::Stream, Bus::new("Stream".to_string())),
                 (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
             ]);
@@ -41,7 +41,7 @@ impl AudioManager {
         Self {
             channel_manager,
             buses,
-            pw_core
+            audio_backend
         }
     }
 
@@ -66,6 +66,10 @@ impl AudioManager {
         self.channel_manager.toggle_mute(uuid, bus);
     }
 
+    pub fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>> {
+        self.audio_backend.get_nodes()
+    }
+
     pub fn get_channels(&self) -> &HashMap<Uuid, Channel> {
         self.channel_manager.get_channels()
     }
@@ -74,15 +78,11 @@ impl AudioManager {
         &self.buses
     }
 
-    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<PwEvent>>> {
-        self.pw_core.get_event_receiver()
+    pub fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
+        self.audio_backend.get_event_receiver()
     }
 
-    pub fn get_nodes(&self) -> HashMap<u32, PwNode> {
-        self.pw_core.get_nodes()
-    }
-
-    pub fn process_events(&self) {
-        self.pw_core.process_events();
+    pub fn process_event(&self, event: AudioEvent) {
+        self.audio_backend.process_event(event);
     }
 }

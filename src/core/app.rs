@@ -1,6 +1,7 @@
 use uuid::Uuid;
 use std::time::Duration;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use log::info;
 use lucide_icons::iced::icon_plus;
 use futures::SinkExt;
@@ -26,16 +27,15 @@ use iced::{
 
 use crate::audio::{
     NewChannelData,
-    audio_manager::{AudioManager, ChannelBus}
+    audio_manager::{AudioManager, ChannelBus},
+    backend::{AudioBackend, AudioEvent}
 };
+
 
 use crate::core::{
     config::Config,
     modal::{Modal, modal}
 };
-
-use crate::pipewire::pw_core::{PwCore, PwEvent};
-
 
 pub struct App {
     audio_manager: AudioManager,
@@ -56,8 +56,8 @@ pub enum Message {
     MonitorMuteToggled(Uuid),
     StreamMuteToggled(Uuid),
 
-    // PipeWire
-    PipeWireEvent(PwEvent),
+    // Audio Backend
+    AudioBackendEvent(AudioEvent),
 
     // Create Channel Modal
     ShowCreateChannelModal,
@@ -70,14 +70,14 @@ pub enum Message {
 
 impl App {
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        pw_event_subscription(self.audio_manager.get_event_receiver())
+        backend_event_subscription(self.audio_manager.get_event_receiver())
     }
 
     pub fn new() -> Self {
         let config = Config::load();
 
         Self {
-            audio_manager: AudioManager::new(config.clone(), PwCore::new()),
+            audio_manager: AudioManager::new(config.clone(), create_backend()),
             config,
             create_channel_modal: Modal::new(NewChannelData {
                 name: "".to_string()
@@ -120,13 +120,12 @@ impl App {
                 info!("Stream Mute Toggled: {}", uuid);
                 self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
             }
-            Message::PipeWireEvent(event) => {
-                self.audio_manager.process_events();
-                info!("PipeWire Event: {:?}", event);
-
-                // TODO: Actually Do Things
-                // Handle the event - you can add your logic here
-                // For example, update UI state based on node additions/removals
+            Message::AudioBackendEvent(event) => {
+                info!("Audio Backend Event: {:?}", event);
+                // Pass the event directly to the backend for state updates.
+                // The subscription worker already consumed the event from the channel,
+                // so we pass it through rather than re-polling an empty channel.
+                self.audio_manager.process_event(event);
             }
             Message::NewChannelContentChanged(content) => {
                 self.create_channel_modal.data.as_mut().unwrap().name = content;
@@ -234,50 +233,29 @@ impl App {
             .max_width(400)
             .into()
     }
-
-    fn app_names_modal(&self, uuid: Uuid) -> iced::Element<'_, Message> {
-        let channel = self.audio_manager.get_channels().get(&uuid).clone();
-        let nodes = self.audio_manager.get_nodes();
-
-        container(column![
-            text("Routing to this channel").center(),
-            text(channel.as_ref().unwrap().app_names.join(", ")),
-            text("Souces not routed to this channel").center(),
-            row(
-                nodes
-                    .iter()
-                    .filter(|(_id, node)| node.media_class.is_input())
-                    .map(|(_id, node)| text(node.name.clone()).into())
-            ).spacing(10),
-        ].spacing(10))
-            .padding(padding::vertical(10).horizontal(20))
-            .style(container::rounded_box)
-            .max_width(400)
-            .into()
-    }
 }
 
-// Subscription for PipeWire events
+// Subscription for Audio events
 #[derive(Clone)]
-struct PwEventReceiver(Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>);
+struct BackendEventReceiver(Arc<Mutex<mpsc::Receiver<AudioEvent>>>);
 
-impl std::hash::Hash for PwEventReceiver {
+impl std::hash::Hash for BackendEventReceiver {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::ptr::hash(&*self.0, state);
     }
 }
 
-fn pw_event_subscription(
-    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<PwEvent>>>
+fn backend_event_subscription(
+    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>
 ) -> iced::Subscription<Message> {
     iced::Subscription::run_with(
-        PwEventReceiver(receiver),
-        pw_event_worker
+        BackendEventReceiver(receiver),
+        backend_event_worker
     )
 }
 
-fn pw_event_worker(
-    receiver_wrapper: &PwEventReceiver
+fn backend_event_worker(
+    receiver_wrapper: &BackendEventReceiver
 ) -> iced::futures::stream::BoxStream<'static, Message> {
     let receiver = Arc::clone(&receiver_wrapper.0);
 
@@ -292,7 +270,7 @@ fn pw_event_worker(
                 };
 
                 if let Some(event) = event {
-                    let _ = output.send(Message::PipeWireEvent(event)).await;
+                    let _ = output.send(Message::AudioBackendEvent(event)).await;
                 }
 
                 tokio::time::sleep(Duration::from_millis(16)).await;
@@ -301,3 +279,20 @@ fn pw_event_worker(
     }))
 }
 
+// Create correct audio backend
+#[cfg(target_os = "linux")]
+fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(crate::platform::pipewire::PipewireBackend::new())
+}
+
+#[cfg(target_os = "macos")]
+fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(crate::platform::coreaudio::CoreAudioBackend::new())
+}
+
+#[cfg(target_os = "windows")]
+compile_error!("Windows is not yet supported");
+//Box::new(crate::platform::wasapi::WasapiBackend::new())
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+compile_error!("Unsupported platform");
