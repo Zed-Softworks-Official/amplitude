@@ -1,12 +1,8 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use lucide_icons::iced::{
-    icon_headphones,
-    icon_headphone_off,
-    icon_wifi,
+    icon_headphone_off, icon_headphones, icon_mic, icon_speaker, icon_wifi,
     icon_wifi_off,
-    icon_speaker,
-    icon_mic
 };
 
 #[derive(Debug, PartialEq, Clone, Eq, Serialize, Deserialize)]
@@ -17,7 +13,7 @@ pub enum Icon {
     Monitor,
     MonitorMuted,
     Stream,
-    StreamMuted
+    StreamMuted,
 }
 
 pub fn get_icon(icon: Icon) -> iced::widget::Text<'static> {
@@ -27,6 +23,6 @@ pub fn get_icon(icon: Icon) -> iced::widget::Text<'static> {
         Icon::MonitorMuted => icon_headphone_off(),
         Icon::Stream => icon_wifi(),
         Icon::StreamMuted => icon_wifi_off(),
-        Icon::Microphone => icon_mic()
+        Icon::Microphone => icon_mic(),
     }
 }

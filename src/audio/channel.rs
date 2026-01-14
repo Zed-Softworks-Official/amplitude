@@ -1,34 +1,18 @@
-use uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::core::{
     app::Message,
-    icon::{
-        Icon,
-        get_icon
-    },
+    icon::{Icon, get_icon},
 };
 
 use crate::audio::bus::BusOptions;
 
 use iced::widget::{
-    text,
-    container,
-    column,
-    progress_bar,
-    button,
-    row,
-    vertical_slider,
+    button, column, container, progress_bar, row, text, vertical_slider,
 };
 
-use iced::{
-    padding,
-    Background,
-    Color,
-    Border,
-    Alignment,
-    Length,
-};
+use iced::{Alignment, Background, Border, Color, Length, padding};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
@@ -38,14 +22,11 @@ pub struct Channel {
     pub channel_name: String,
     pub app_names: Vec<String>,
     pub monitor_bus_options: BusOptions,
-    pub stream_bus_options: BusOptions
+    pub stream_bus_options: BusOptions,
 }
 
 impl Channel {
-    pub fn new(
-        channel_name: String,
-        icon: Icon
-    ) -> Self {
+    pub fn new(channel_name: String, icon: Icon) -> Self {
         Self {
             id: Uuid::new_v4(),
             channel_name,
@@ -64,11 +45,11 @@ impl Channel {
             app_names: channel.app_names.clone(),
             monitor_bus_options: BusOptions::new(
                 channel.monitor_bus_options.volume,
-                channel.monitor_bus_options.muted
+                channel.monitor_bus_options.muted,
             ),
             stream_bus_options: BusOptions::new(
                 channel.stream_bus_options.volume,
-                channel.stream_bus_options.muted
+                channel.stream_bus_options.muted,
             ),
         }
     }
@@ -76,36 +57,44 @@ impl Channel {
     pub fn view(&self) -> iced::Element<'_, Message> {
         let channel_name = text(self.channel_name.clone());
 
-        let sliders = container(row![
-            column![
-                vertical_slider(
-                    0.0..=1.0,
-                    self.monitor_bus_options.volume,
-                    |v| Message::MonitorVolumeChanged(self.id, v)
-                ).step(0.1),
-                get_icon(Icon::Monitor).size(20),
-                button(text("Mute"))
-                    .on_press(Message::MonitorMuteToggled(self.id))
-                    .style(match self.monitor_bus_options.muted {
-                        true => button::danger,
-                        false => button::primary
-                    })
-            ].spacing(20).align_x(Alignment::Center),
-            column![
-                vertical_slider(
-                    0.0..=1.0,
-                    self.stream_bus_options.volume,
-                    |v| Message::StreamVolumeChanged(self.id, v)
-                ).step(0.1),
-                get_icon(Icon::Stream).size(20),
-                button(text("Mute"))
-                    .on_press(Message::StreamMuteToggled(self.id))
-                    .style(match self.stream_bus_options.muted {
-                        true => button::danger,
-                        false => button::primary
-                    })
-            ].spacing(20)
-        ].spacing(10));
+        let sliders = container(
+            row![
+                column![
+                    vertical_slider(
+                        0.0..=1.0,
+                        self.monitor_bus_options.volume,
+                        |v| Message::MonitorVolumeChanged(self.id, v)
+                    )
+                    .step(0.1),
+                    get_icon(Icon::Monitor).size(20),
+                    button(text("Mute"))
+                        .on_press(Message::MonitorMuteToggled(self.id))
+                        .style(match self.monitor_bus_options.muted {
+                            true => button::danger,
+                            false => button::primary,
+                        })
+                ]
+                .spacing(20)
+                .align_x(Alignment::Center),
+                column![
+                    vertical_slider(
+                        0.0..=1.0,
+                        self.stream_bus_options.volume,
+                        |v| Message::StreamVolumeChanged(self.id, v)
+                    )
+                    .step(0.1),
+                    get_icon(Icon::Stream).size(20),
+                    button(text("Mute"))
+                        .on_press(Message::StreamMuteToggled(self.id))
+                        .style(match self.stream_bus_options.muted {
+                            true => button::danger,
+                            false => button::primary,
+                        })
+                ]
+                .spacing(20)
+            ]
+            .spacing(10),
+        );
 
         let app_names_button = button(text("Apps").center())
             .on_press(Message::ShowAppNamesModal(self.id))
@@ -116,22 +105,32 @@ impl Channel {
                 row![
                     get_icon(self.icon.clone()),
                     channel_name
-                ].spacing(10),
+                ]
+                .spacing(10),
                 app_names_button,
                 progress_bar(0.0..=1.0, self.monitor_bus_options.level),
                 sliders
-            ].spacing(10))
-            .padding(padding::top(20).left(10).right(10).bottom(20))
-            .style(|_| container::Style {
-                background: Some(Background::Color(Color::from_rgb(0.15, 0.15, 0.15))),
-                border: Border {
-                    radius: 8.0.into(),
-                    width: 1.0,
-                    color: Color::from_rgb(0.15, 0.15, 0.15),
-                },
-                ..Default::default()
-            })
-            .into()
+            ]
+            .spacing(10),
+        )
+        .padding(
+            padding::top(20)
+                .left(10)
+                .right(10)
+                .bottom(20),
+        )
+        .style(|_| container::Style {
+            background: Some(Background::Color(Color::from_rgb(
+                0.15, 0.15, 0.15,
+            ))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgb(0.15, 0.15, 0.15),
+            },
+            ..Default::default()
+        })
+        .into()
     }
 }
 

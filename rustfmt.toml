@@ -1,0 +1,33 @@
+edition = "2024"
+max_width = 80
+
+tab_spaces = 4
+hard_tabs = false
+
+fn_single_line = false
+
+reorder_imports = true
+reorder_modules = true
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+
+imports_layout = "Mixed"
+indent_style = "Block"
+
+trailing_comma = "Vertical"
+
+fn_params_layout = "Tall"
+overflow_delimited_expr = true
+
+struct_lit_width = 18
+struct_variant_width = 18
+array_width = 30
+chain_width = 40
+single_line_if_else_max_width = 0
+
+wrap_comments = true
+comment_width = 80
+
+normalize_doc_attributes = true
+format_code_in_doc_comments = true
+

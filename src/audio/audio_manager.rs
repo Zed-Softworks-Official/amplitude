@@ -1,47 +1,40 @@
-use uuid::Uuid;
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 use crate::audio::{
-    channel_manager::ChannelManager,
-    bus::Bus,
-    channel::Channel
+    bus::Bus, channel::Channel, channel_manager::ChannelManager,
 };
 
-use crate::audio::backend::{
-    AudioBackend,
-    AudioEvent,
-    AudioNode
-};
+use crate::audio::backend::{AudioBackend, AudioEvent, AudioNode};
 use crate::core::config::Config;
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum ChannelBus {
     Monitor,
-    Stream
+    Stream,
 }
 
 pub struct AudioManager {
     audio_backend: Box<dyn AudioBackend>,
     channel_manager: ChannelManager,
-    buses: HashMap<ChannelBus, Bus>
+    buses: HashMap<ChannelBus, Bus>,
 }
 
 impl AudioManager {
     pub fn new(config: Config, audio_backend: Box<dyn AudioBackend>) -> Self {
-        let buses = HashMap::from(
-            [
-                (ChannelBus::Stream, Bus::new("Stream".to_string())),
-                (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
-            ]);
+        let buses = HashMap::from([
+            (ChannelBus::Stream, Bus::new("Stream".to_string())),
+            (ChannelBus::Monitor, Bus::new("Monitor".to_string())),
+        ]);
 
         let channel_manager = ChannelManager::new(config);
 
         Self {
             channel_manager,
             buses,
-            audio_backend
+            audio_backend,
         }
     }
 
@@ -49,21 +42,14 @@ impl AudioManager {
         self.channel_manager.add_channel(name)
     }
 
-    pub fn update_volume(
-        &mut self,
-        uuid: Uuid,
-        volume: f32,
-        bus: ChannelBus
-    ) {
-        self.channel_manager.update_volume(uuid, volume, bus);
+    pub fn update_volume(&mut self, uuid: Uuid, volume: f32, bus: ChannelBus) {
+        self.channel_manager
+            .update_volume(uuid, volume, bus);
     }
 
-    pub fn toggle_mute(
-        &mut self,
-        uuid: Uuid,
-        bus: ChannelBus
-    ) {
-        self.channel_manager.toggle_mute(uuid, bus);
+    pub fn toggle_mute(&mut self, uuid: Uuid, bus: ChannelBus) {
+        self.channel_manager
+            .toggle_mute(uuid, bus);
     }
 
     pub fn get_nodes(&self) -> Arc<Mutex<HashMap<u32, AudioNode>>> {

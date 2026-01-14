@@ -1,9 +1,11 @@
-use tokio::sync::mpsc;
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 
 pub trait AudioBackend {
-    fn new() -> Self where Self: Sized;
+    fn new() -> Self
+    where
+        Self: Sized;
     fn send_command(&self, cmd: BackendCommand);
     fn get_event_receiver(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>>;
     fn process_event(&self, event: AudioEvent);
@@ -32,27 +34,44 @@ pub struct AudioNode {
     pub app_info: Option<AppInfo>,
     pub device_info: Option<DeviceInfo>,
     pub sample_rate: Option<u32>,
-    pub format: Option<String>
+    pub format: Option<String>,
 }
 
 impl AudioNode {
     #[cfg(target_os = "linux")]
     pub fn from_props(id: u32, props: &HashMap<String, String>) -> Self {
-        let name = props.get("name").cloned().unwrap_or_default();
+        let name = props
+            .get("name")
+            .cloned()
+            .unwrap_or_default();
         let nick = props.get("nick").cloned();
-        let media_class = MediaClass::from_str(&props.get("media.class").cloned().unwrap_or_default());
-        let app_info = props.get("application.name").cloned().map(|name| AppInfo {
-            name: Some(name),
-            binary: None,
-            pid: None,
-            icon_name: None,
-        });
-        let device_info = props.get("device.description").cloned().map(|desc| DeviceInfo {
-            description: Some(desc),
-            card_name: None,
-            is_default: false,
-        });
-        let sample_rate = props.get("format.sample_rate").cloned().map(|rate| rate.parse::<u32>().unwrap_or_default());
+        let media_class = MediaClass::from_str(
+            &props
+                .get("media.class")
+                .cloned()
+                .unwrap_or_default(),
+        );
+        let app_info = props
+            .get("application.name")
+            .cloned()
+            .map(|name| AppInfo {
+                name: Some(name),
+                binary: None,
+                pid: None,
+                icon_name: None,
+            });
+        let device_info = props
+            .get("device.description")
+            .cloned()
+            .map(|desc| DeviceInfo {
+                description: Some(desc),
+                card_name: None,
+                is_default: false,
+            });
+        let sample_rate = props
+            .get("format.sample_rate")
+            .cloned()
+            .map(|rate| rate.parse::<u32>().unwrap_or_default());
         let format = props.get("format.format").cloned();
 
         Self {
@@ -98,7 +117,7 @@ pub enum MediaClass {
     AudioSource,
     StreamOutputAudio,
     StreamInputAudio,
-    Unknown
+    Unknown,
 }
 
 impl MediaClass {
@@ -109,8 +128,7 @@ impl MediaClass {
             "Audio/Source" => MediaClass::AudioSource,
             "Stream/Output/Audio" => MediaClass::StreamOutputAudio,
             "Stream/Input/Audio" => MediaClass::StreamInputAudio,
-            _ => MediaClass::Unknown
+            _ => MediaClass::Unknown,
         }
     }
 }
-

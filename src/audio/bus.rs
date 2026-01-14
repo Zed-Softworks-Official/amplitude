@@ -1,21 +1,9 @@
 use crate::core::app::Message;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use iced::widget::{
-    text,
-    button,
-    progress_bar,
-    row,
-    container
-};
+use iced::widget::{button, container, progress_bar, row, text};
 
-use iced::{
-    Border,
-    Color,
-    Background,
-    padding,
-    Alignment
-};
+use iced::{Alignment, Background, Border, Color, padding};
 
 #[derive(Debug, Clone)]
 pub struct Bus {
@@ -34,7 +22,6 @@ impl Bus {
     }
 
     pub fn view(&self) -> iced::Element<'_, Message> {
-
         let bus_strip = row![
             text(self.name.clone()),
             progress_bar(0.0..=1.0, self.level),
@@ -42,12 +29,16 @@ impl Bus {
                 true => button::danger,
                 false => button::primary,
             })
-        ].spacing(10).align_y(Alignment::Center);
+        ]
+        .spacing(10)
+        .align_y(Alignment::Center);
 
         container(bus_strip)
             .padding(padding::vertical(10).horizontal(20))
             .style(|_| container::Style {
-                background: Some(Background::Color(Color::from_rgb(0.1, 0.1, 0.1))),
+                background: Some(Background::Color(Color::from_rgb(
+                    0.1, 0.1, 0.1,
+                ))),
                 border: Border {
                     color: Color::from_rgb(0.1, 0.1, 0.1),
                     width: 1.0,
@@ -62,8 +53,8 @@ impl Bus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BusOptions {
     pub volume: f32, // Volume for slider
-    pub level: f32, // Level for vu meter
-    pub muted: bool
+    pub level: f32,  // Level for vu meter
+    pub muted: bool,
 }
 
 impl BusOptions {
@@ -71,7 +62,7 @@ impl BusOptions {
         BusOptions {
             level: volume.clamp(0.0, 1.0),
             volume,
-            muted
+            muted,
         }
     }
 }

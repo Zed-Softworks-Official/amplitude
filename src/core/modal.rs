@@ -1,24 +1,18 @@
-use iced::widget::{
-    stack,
-    opaque,
-    mouse_area,
-    center,
-    container
-};
+use iced::widget::{center, container, mouse_area, opaque, stack};
 
 use iced::Color;
 
 #[derive(Default)]
 pub struct Modal<T> {
     pub show_modal: bool,
-    pub data: Option<T>
+    pub data: Option<T>,
 }
 
 impl<T> Modal<T> {
     pub fn new(data: T) -> Self {
         Self {
             show_modal: false,
-            data: Some(data)
+            data: Some(data),
         }
     }
 
@@ -36,7 +30,7 @@ pub fn modal<'a, Message>(
     content: impl Into<iced::Element<'a, Message>>,
     on_blur: Message,
 ) -> iced::Element<'a, Message>
-    where
+where
     Message: Clone + 'a,
 {
     stack![
@@ -44,15 +38,18 @@ pub fn modal<'a, Message>(
         opaque(
             mouse_area(center(opaque(content)).style(|_theme| {
                 container::Style {
-                    background: Some(Color {
-                        a: 0.8,
-                        ..Color::BLACK
-                    }.into()
+                    background: Some(
+                        Color {
+                            a: 0.8,
+                            ..Color::BLACK
+                        }
+                        .into(),
                     ),
                     ..container::Style::default()
                 }
             }))
-                .on_press(on_blur)
+            .on_press(on_blur)
         )
-    ].into()
+    ]
+    .into()
 }

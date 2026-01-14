@@ -1,25 +1,23 @@
-use serde::{Serialize, Deserialize};
-use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
-use std::fs;
 use crate::audio::Channel;
 use crate::core::icon::Icon;
+use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
-    pub channels: Vec<Channel>
+    pub channels: Vec<Channel>,
 }
 
 impl Config {
     fn new() -> Self {
         Self {
-            channels: vec![
-                Channel::new(
-                    "Microphone".to_string(),
-                    Icon::Microphone
-                )
-            ]
+            channels: vec![Channel::new(
+                "Microphone".to_string(),
+                Icon::Microphone,
+            )],
         }
     }
 
@@ -41,7 +39,8 @@ impl Config {
 
     pub fn save(&mut self, channels: Option<HashMap<Uuid, Channel>>) {
         if let Some(channels) = channels {
-            self.channels = channels.iter()
+            self.channels = channels
+                .iter()
                 .map(|(_id, channel)| channel.clone())
                 .collect();
         }
@@ -52,5 +51,8 @@ impl Config {
 }
 
 fn config_path() -> std::path::PathBuf {
-    dirs::config_dir().unwrap().join("amplitude").join("config.toml")
+    dirs::config_dir()
+        .unwrap()
+        .join("amplitude")
+        .join("config.toml")
 }

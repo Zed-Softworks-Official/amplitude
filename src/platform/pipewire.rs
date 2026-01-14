@@ -1,22 +1,15 @@
 use std::{
-    thread,
+    collections::HashMap,
     sync::{Arc, Mutex},
-    collections::HashMap
+    thread,
 };
 
 use log::error;
 
-use pw::{
-    main_loop::MainLoopRc,
-    context::ContextRc,
-};
+use pw::{context::ContextRc, main_loop::MainLoopRc};
 
 use crate::audio::backend::{
-    AudioBackend,
-    AudioEvent,
-    AudioNode,
-    BackendCommand,
-    MediaClass,
+    AudioBackend, AudioEvent, AudioNode, BackendCommand, MediaClass,
 };
 
 use tokio::sync::mpsc;
@@ -58,8 +51,11 @@ impl AudioBackend for PipewireBackend {
     fn process_event(&self, event: AudioEvent) {
         match event {
             AudioEvent::NodeAdded(node) => {
-                self.nodes.lock().unwrap().insert(node.id, node);
-            },
+                self.nodes
+                    .lock()
+                    .unwrap()
+                    .insert(node.id, node);
+            }
             AudioEvent::NodeRemoved(id) => {
                 self.nodes.lock().unwrap().remove(&id);
             }
@@ -73,7 +69,7 @@ impl AudioBackend for PipewireBackend {
 
 fn pw_thread(
     main_sender: mpsc::Sender<AudioEvent>,
-    pw_receiver: pw::channel::Receiver<BackendCommand>
+    pw_receiver: pw::channel::Receiver<BackendCommand>,
 ) {
     pw::init();
 
@@ -113,7 +109,8 @@ fn pw_thread(
     let sender_remove = main_sender;
 
     // Listen for new nodes
-    let _listener = registry.add_listener_local()
+    let _listener = registry
+        .add_listener_local()
         .global(move |global| {
             if global.type_ != pw::types::ObjectType::Node {
                 return;
@@ -123,7 +120,8 @@ fn pw_thread(
                 .props
                 .as_ref()
                 .map(|props| {
-                    props.iter()
+                    props
+                        .iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect()
                 })
@@ -143,15 +141,14 @@ fn pw_thread(
 
     // Handle commands from the app
     let mainloop_weak = mainloop.downgrade();
-    let _receiver = pw_receiver.attach(mainloop.loop_(), move |cmd| {
-        match cmd {
+    let _receiver =
+        pw_receiver.attach(mainloop.loop_(), move |cmd| match cmd {
             BackendCommand::Terminate => {
                 if let Some(mainloop) = mainloop_weak.upgrade() {
                     mainloop.quit();
                 }
             }
-        }
-    });
+        });
 
-   mainloop.run();
+    mainloop.run();
 }

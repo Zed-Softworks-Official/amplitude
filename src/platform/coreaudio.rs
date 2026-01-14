@@ -1,13 +1,10 @@
 use crate::audio::backend::{
-    AudioBackend,
-    BackendCommand,
-    AudioEvent,
-    AudioNode,
+    AudioBackend, AudioEvent, AudioNode, BackendCommand,
 };
 
 use std::collections::HashMap;
-use std::thread;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use tokio::sync::mpsc;
 
 pub struct CoreAudioBackend {
@@ -19,7 +16,8 @@ pub struct CoreAudioBackend {
 
 impl AudioBackend for CoreAudioBackend {
     fn new() -> Self {
-        let (command_sender, command_receiver) = mpsc::channel::<BackendCommand>(100);
+        let (command_sender, command_receiver) =
+            mpsc::channel::<BackendCommand>(100);
         let (event_sender, event_receiver) = mpsc::channel::<AudioEvent>(100);
 
         let thread_handle = thread::spawn(move || {
@@ -47,8 +45,11 @@ impl AudioBackend for CoreAudioBackend {
     fn process_event(&self, event: AudioEvent) {
         match event {
             AudioEvent::NodeAdded(node) => {
-                self.nodes.lock().unwrap().insert(node.id, node);
-            },
+                self.nodes
+                    .lock()
+                    .unwrap()
+                    .insert(node.id, node);
+            }
             AudioEvent::NodeRemoved(id) => {
                 self.nodes.lock().unwrap().remove(&id);
             }
@@ -62,7 +63,7 @@ impl AudioBackend for CoreAudioBackend {
 
 fn coreaudio_thread(
     main_sender: mpsc::Sender<AudioEvent>,
-    command_receiver: mpsc::Receiver<BackendCommand>
+    command_receiver: mpsc::Receiver<BackendCommand>,
 ) {
     log::info!("CoreAudio backend thread started");
 }

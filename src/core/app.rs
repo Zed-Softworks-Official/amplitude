@@ -1,40 +1,28 @@
-use uuid::Uuid;
-use std::time::Duration;
-use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use futures::SinkExt;
 use log::info;
 use lucide_icons::iced::icon_plus;
-use futures::SinkExt;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::sync::mpsc;
+use uuid::Uuid;
 
 use iced::widget::{
-    button,
-    column,
-    text_input,
-    row,
-    text,
-    container,
-    Scrollable,
+    Scrollable, button, column, container, row,
     scrollable::{Direction, Scrollbar},
+    text, text_input,
 };
 
-use iced::{
-    Length,
-    padding,
-    Alignment,
-    Theme,
-    Border,
-};
+use iced::{Alignment, Border, Length, Theme, padding};
 
 use crate::audio::{
     NewChannelData,
     audio_manager::{AudioManager, ChannelBus},
-    backend::{AudioBackend, AudioEvent}
+    backend::{AudioBackend, AudioEvent},
 };
-
 
 use crate::core::{
     config::Config,
-    modal::{Modal, modal}
+    modal::{Modal, modal},
 };
 
 pub struct App {
@@ -80,7 +68,7 @@ impl App {
             audio_manager: AudioManager::new(config.clone(), create_backend()),
             config,
             create_channel_modal: Modal::new(NewChannelData {
-                name: "".to_string()
+                name: "".to_string(),
             }),
         }
     }
@@ -89,36 +77,51 @@ impl App {
         match msg {
             Message::ShowCreateChannelModal => {
                 self.create_channel_modal.show();
-            },
+            }
             Message::HideCreateChannelModal => {
                 self.create_channel_modal.hide();
-            },
+            }
             Message::AddChannel => {
                 self.audio_manager.add_channel(
-                    self.create_channel_modal.data
+                    self.create_channel_modal
+                        .data
                         .as_ref()
                         .unwrap()
                         .name
-                        .as_str()
+                        .as_str(),
                 );
 
-                self.config.save(Some(self.audio_manager.get_channels().clone()));
-            },
+                self.config.save(Some(
+                    self.audio_manager
+                        .get_channels()
+                        .clone(),
+                ));
+            }
             Message::MonitorVolumeChanged(uuid, volume) => {
                 info!("Monitor Volume Changed: {} (uuid: {})", volume, uuid);
-                self.audio_manager.update_volume(uuid, volume, ChannelBus::Monitor);
-            },
+                self.audio_manager.update_volume(
+                    uuid,
+                    volume,
+                    ChannelBus::Monitor,
+                );
+            }
             Message::StreamVolumeChanged(uuid, volume) => {
                 info!("Stream Volume Changed: {} (uuid: {})", volume, uuid);
-                self.audio_manager.update_volume(uuid, volume, ChannelBus::Stream);
+                self.audio_manager.update_volume(
+                    uuid,
+                    volume,
+                    ChannelBus::Stream,
+                );
             }
             Message::MonitorMuteToggled(uuid) => {
                 info!("Monitor Mute Toggled: {}", uuid);
-                self.audio_manager.toggle_mute(uuid, ChannelBus::Monitor);
-            },
+                self.audio_manager
+                    .toggle_mute(uuid, ChannelBus::Monitor);
+            }
             Message::StreamMuteToggled(uuid) => {
                 info!("Stream Mute Toggled: {}", uuid);
-                self.audio_manager.toggle_mute(uuid, ChannelBus::Stream);
+                self.audio_manager
+                    .toggle_mute(uuid, ChannelBus::Stream);
             }
             Message::AudioBackendEvent(event) => {
                 info!("Audio Backend Event: {:?}", event);
@@ -128,25 +131,32 @@ impl App {
                 self.audio_manager.process_event(event);
             }
             Message::NewChannelContentChanged(content) => {
-                self.create_channel_modal.data.as_mut().unwrap().name = content;
-            },
+                self.create_channel_modal
+                    .data
+                    .as_mut()
+                    .unwrap()
+                    .name = content;
+            }
             Message::ShowAppNamesModal(uuid) => {
                 info!("Show App Names Modal: {}", uuid);
-            },
+            }
         };
     }
 
     pub fn view(&self) -> iced::Element<'_, Message> {
         // Channel Button
-        let button_content = container(column![
-            icon_plus().size(35),
-            text("Add Channel").size(20).center()
-        ].spacing(10).align_x(Alignment::Center)
+        let button_content = container(
+            column![
+                icon_plus().size(35),
+                text("Add Channel").size(20).center()
+            ]
+            .spacing(10)
+            .align_x(Alignment::Center),
         )
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_x(Alignment::Center)
-            .align_y(Alignment::Center);
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center);
 
         let add_channel_button = button(button_content)
             .on_press(Message::ShowCreateChannelModal)
@@ -163,11 +173,12 @@ impl App {
             });
 
         // Channel Strips
-        let channels = row(
-            self.audio_manager.get_channels()
-                .iter()
-                .map(|(_id, channel)| channel.view().into())
-        ).spacing(10);
+        let channels = row(self
+            .audio_manager
+            .get_channels()
+            .iter()
+            .map(|(_id, channel)| channel.view().into()))
+        .spacing(10);
 
         let channel_strip = Scrollable::new(channels)
             .direction(Direction::Horizontal(Scrollbar::new()));
@@ -176,62 +187,85 @@ impl App {
         let channel_section = container(
             column![
                 text("INPUTS"),
-                row![channel_strip, add_channel_button]
-                    .spacing(20)
-            ].spacing(10)
+                row![
+                    channel_strip,
+                    add_channel_button
+                ]
+                .spacing(20)
+            ]
+            .spacing(10),
         )
-            .padding(padding::vertical(10).left(20).right(20))
-            .style(container::rounded_box)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        .padding(padding::vertical(10).left(20).right(20))
+        .style(container::rounded_box)
+        .width(Length::Fill)
+        .height(Length::Fill);
 
         // Buses
         let busses = column(
-            self.audio_manager.get_busses()
+            self.audio_manager
+                .get_busses()
                 .iter()
-                .map(|(_name, bus)| bus.view().into())
-        ).spacing(10);
+                .map(|(_name, bus)| bus.view().into()),
+        )
+        .spacing(10);
 
         let bus_strip = container(column![text("OUTPUT"), busses].spacing(10))
-            .padding(padding::top(10).bottom(20).horizontal(20));
+            .padding(
+                padding::top(10)
+                    .bottom(20)
+                    .horizontal(20),
+            );
 
-        let interface = column![channel_section, bus_strip]
-            .spacing(20);
+        let interface = column![channel_section, bus_strip].spacing(20);
 
         if self.create_channel_modal.show_modal {
-            modal(interface, self.new_channel_modal(), Message::HideCreateChannelModal)
+            modal(
+                interface,
+                self.new_channel_modal(),
+                Message::HideCreateChannelModal,
+            )
         } else {
             interface.into()
         }
     }
 
     fn new_channel_modal(&self) -> iced::Element<'_, Message> {
-        container(column![
-            text("Create a new channel"),
-            text_input(
-                "Channel Name",
-                &self.create_channel_modal.data.as_ref().unwrap().name,
-            )
+        container(
+            column![
+                text("Create a new channel"),
+                text_input(
+                    "Channel Name",
+                    &self
+                        .create_channel_modal
+                        .data
+                        .as_ref()
+                        .unwrap()
+                        .name,
+                )
                 .on_input(Message::NewChannelContentChanged)
                 .padding(5),
-            row![
-                container(
-                    button(text("Cancel"))
-                        .on_press(Message::HideCreateChannelModal)
-                        .style(button::danger)
-                ).align_left(iced::Fill),
-                container(
-                    button(text("Create"))
-                        .on_press(Message::AddChannel)
-                        .style(button::primary)
-
-                ).align_right(iced::Fill),
-            ].width(Length::Fill)
-        ].spacing(10))
-            .padding(padding::vertical(10).horizontal(20))
-            .style(container::rounded_box)
-            .max_width(400)
-            .into()
+                row![
+                    container(
+                        button(text("Cancel"))
+                            .on_press(Message::HideCreateChannelModal)
+                            .style(button::danger)
+                    )
+                    .align_left(iced::Fill),
+                    container(
+                        button(text("Create"))
+                            .on_press(Message::AddChannel)
+                            .style(button::primary)
+                    )
+                    .align_right(iced::Fill),
+                ]
+                .width(Length::Fill)
+            ]
+            .spacing(10),
+        )
+        .padding(padding::vertical(10).horizontal(20))
+        .style(container::rounded_box)
+        .max_width(400)
+        .into()
     }
 }
 
@@ -246,37 +280,42 @@ impl std::hash::Hash for BackendEventReceiver {
 }
 
 fn backend_event_subscription(
-    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>
+    receiver: Arc<std::sync::Mutex<tokio::sync::mpsc::Receiver<AudioEvent>>>,
 ) -> iced::Subscription<Message> {
     iced::Subscription::run_with(
         BackendEventReceiver(receiver),
-        backend_event_worker
+        backend_event_worker,
     )
 }
 
 fn backend_event_worker(
-    receiver_wrapper: &BackendEventReceiver
+    receiver_wrapper: &BackendEventReceiver,
 ) -> iced::futures::stream::BoxStream<'static, Message> {
     let receiver = Arc::clone(&receiver_wrapper.0);
 
-    Box::pin(iced::stream::channel(100, move |mut output: futures::channel::mpsc::Sender<Message>| {
-        let receiver = Arc::clone(&receiver);
-        async move {
-            loop {
-                // Try to receive events from PipeWire
-                let event = {
-                    let mut rx = receiver.lock().unwrap();
-                    rx.try_recv().ok()
-                };
+    Box::pin(iced::stream::channel(
+        100,
+        move |mut output: futures::channel::mpsc::Sender<Message>| {
+            let receiver = Arc::clone(&receiver);
+            async move {
+                loop {
+                    // Try to receive events from PipeWire
+                    let event = {
+                        let mut rx = receiver.lock().unwrap();
+                        rx.try_recv().ok()
+                    };
 
-                if let Some(event) = event {
-                    let _ = output.send(Message::AudioBackendEvent(event)).await;
+                    if let Some(event) = event {
+                        let _ = output
+                            .send(Message::AudioBackendEvent(event))
+                            .await;
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(16)).await;
                 }
-
-                tokio::time::sleep(Duration::from_millis(16)).await;
             }
-        }
-    }))
+        },
+    ))
 }
 
 // Create correct audio backend
@@ -294,5 +333,9 @@ fn create_backend() -> Box<dyn AudioBackend> {
 compile_error!("Windows is not yet supported");
 //Box::new(crate::platform::wasapi::WasapiBackend::new())
 
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+)))]
 compile_error!("Unsupported platform");
