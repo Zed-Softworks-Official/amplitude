@@ -1,11 +1,8 @@
+import { ComponentExample } from '~/components/component-example'
 import './App.css'
 
-function App() {
-    return (
-        <main>
-            <h1 className="text-3xl">Hello, World!</h1>
-        </main>
-    )
+export function App() {
+    return <ComponentExample />
 }
 
 export default App
