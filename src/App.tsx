@@ -1,8 +1,8 @@
-import { ComponentExample } from '~/components/component-example'
+import { MixerApp } from '~/components/mixer/mixer-app'
 import './App.css'
 
 export function App() {
-    return <ComponentExample />
+    return <MixerApp />
 }
 
 export default App
