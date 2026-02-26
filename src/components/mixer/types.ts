@@ -1,4 +1,4 @@
-export type ChannelId = 'mic' | 'system' | 'browser' | 'vc' | 'game'
+export type ChannelId = 'mic' | 'system' | 'browser' | 'vc' | 'game' | 'music'
 
 export type Bus = 'monitor' | 'stream'
 
@@ -25,6 +25,7 @@ export const CHANNEL_PRESETS: Record<
     browser: { name: 'Browser', icon: 'browser' },
     vc: { name: 'VC', icon: 'vc' },
     game: { name: 'Game', icon: 'game' },
+    music: { name: 'Music', icon: 'music' },
 }
 
 export const ADDABLE_CHANNEL_IDS: ChannelId[] = [
@@ -32,6 +33,7 @@ export const ADDABLE_CHANNEL_IDS: ChannelId[] = [
     'browser',
     'vc',
     'game',
+    'music',
 ]
 
 // --- Static placeholder lists for testing ---

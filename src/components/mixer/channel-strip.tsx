@@ -1,5 +1,29 @@
-import { Volume2Icon, VolumeOffIcon } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
+    GripVerticalIcon,
+    Trash2Icon,
+    Volume2Icon,
+    VolumeOffIcon,
+} from 'lucide-react'
+import { useState } from 'react'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+} from '~/components/ui/context-menu'
 import {
     Select,
     SelectContent,
@@ -22,6 +46,7 @@ interface ChannelStripProps {
     onMuteToggle: (bus: Bus) => void
     onInputDeviceChange: (value: string) => void
     onApplicationsChange: (apps: string[]) => void
+    onDelete?: () => void
 }
 
 function BusColumn({
@@ -91,18 +116,54 @@ export function ChannelStrip({
     onMuteToggle,
     onInputDeviceChange,
     onApplicationsChange,
+    onDelete,
 }: ChannelStripProps) {
     const isFullyMuted = channel.monitorMuted && channel.streamMuted
     const isMic = channel.id === 'mic'
+    const [deleteOpen, setDeleteOpen] = useState(false)
 
-    return (
-        <div className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-primary/20">
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: channel.id,
+        disabled: isMic,
+    })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    }
+
+    const cardContent = (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            className={cn(
+                'group relative flex h-full flex-col items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-accent/30',
+                isDragging && 'z-50',
+            )}
+        >
+            {/* Drag handle - only shown for non-Mic channels */}
+            {!isMic && (
+                <div className="absolute top-2 right-2 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                    <GripVerticalIcon className="size-3.5" />
+                </div>
+            )}
+
             {/* Channel icon + name */}
             <div className="flex flex-col items-center gap-1.5">
                 <div
                     className={cn(
                         'flex size-8 items-center justify-center rounded-lg bg-muted transition-colors',
-                        !isFullyMuted && 'bg-primary/15 text-primary',
+                        !isFullyMuted && 'bg-accent/15 text-accent',
                     )}
                 >
                     <ChannelIcon type={channel.icon} className="size-3.5" />
@@ -160,5 +221,53 @@ export function ChannelStrip({
                 />
             </div>
         </div>
+    )
+
+    return (
+        <>
+            {!isMic ? (
+                <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                        {cardContent}
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                        <ContextMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteOpen(true)}
+                        >
+                            <Trash2Icon />
+                            Delete Channel
+                        </ContextMenuItem>
+                    </ContextMenuContent>
+                </ContextMenu>
+            ) : (
+                cardContent
+            )}
+
+            {/* Delete confirmation dialog */}
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Channel</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete the {channel.name}{' '}
+                            channel? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => {
+                                onDelete?.()
+                                setDeleteOpen(false)
+                            }}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     )
 }

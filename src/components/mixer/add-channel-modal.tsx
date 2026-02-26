@@ -52,7 +52,7 @@ export function AddChannelModal({
                                 }}
                                 className={cn(
                                     'flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left text-sm font-medium transition-colors',
-                                    'hover:border-primary/30 hover:bg-primary/5',
+                                    'hover:border-accent/30 hover:bg-accent/5',
                                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                                     isUsed && 'pointer-events-none opacity-35',
                                 )}

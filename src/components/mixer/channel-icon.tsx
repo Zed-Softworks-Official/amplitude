@@ -4,6 +4,7 @@ import {
     HeadphonesIcon,
     Mic2Icon,
     MonitorIcon,
+    Music2Icon,
 } from 'lucide-react'
 import type { ChannelId } from './types'
 
@@ -13,6 +14,7 @@ const iconMap: Record<ChannelId, React.ElementType> = {
     browser: GlobeIcon,
     vc: HeadphonesIcon,
     game: GamepadIcon,
+    music: Music2Icon,
 }
 
 export function ChannelIcon({

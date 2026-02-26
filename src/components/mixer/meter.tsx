@@ -6,7 +6,7 @@ function getSegmentColor(index: number, total: number) {
     const position = index / total
     if (position >= 0.85) return 'bg-red-500'
     if (position >= 0.7) return 'bg-orange-400'
-    return 'bg-primary'
+    return 'bg-green-500'
 }
 
 export function Meter({

@@ -1,3 +1,17 @@
+import {
+    closestCenter,
+    DndContext,
+    type DragEndEvent,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core'
+import {
+    arrayMove,
+    horizontalListSortingStrategy,
+    SortableContext,
+} from '@dnd-kit/sortable'
 import { PlusIcon, RadioIcon, SpeakerIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Separator } from '~/components/ui/separator'
@@ -5,7 +19,7 @@ import { AddChannelModal } from './add-channel-modal'
 import { ChannelStrip } from './channel-strip'
 import { MasterOutput } from './master-output'
 import type { Bus, Channel, ChannelId } from './types'
-import { CHANNEL_PRESETS } from './types'
+import { ADDABLE_CHANNEL_IDS, CHANNEL_PRESETS } from './types'
 
 function createChannel(id: ChannelId): Channel {
     const preset = CHANNEL_PRESETS[id]
@@ -38,6 +52,29 @@ export function MixerApp() {
         muted: false,
         outputDevice: 'Default Output',
     })
+
+    // dnd-kit sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor),
+    )
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event
+        if (!over || active.id === over.id) return
+
+        const oldIndex = channels.findIndex((ch) => ch.id === active.id)
+        const newIndex = channels.findIndex((ch) => ch.id === over.id)
+
+        // Prevent moving Mic (index 0) or moving anything to index 0
+        if (oldIndex === 0 || newIndex === 0) return
+
+        setChannels((prev) => arrayMove(prev, oldIndex, newIndex))
+    }
 
     const handleVolumeChange = (id: ChannelId, bus: Bus, value: number) => {
         setChannels((prev) =>
@@ -82,40 +119,70 @@ export function MixerApp() {
         setChannels((prev) => [...prev, createChannel(id)])
     }
 
+    const handleDeleteChannel = (id: ChannelId) => {
+        if (id === 'mic') return
+        setChannels((prev) => prev.filter((ch) => ch.id !== id))
+    }
+
     const existingIds = channels.map((ch) => ch.id)
-    const allPresetsUsed = existingIds.length >= 5
+    const allPresetsUsed = ADDABLE_CHANNEL_IDS.every((id) =>
+        existingIds.includes(id),
+    )
 
     return (
         <div className="flex h-screen w-screen overflow-hidden">
             {/* Channel area */}
             <main className="flex flex-1 items-stretch gap-3 overflow-x-auto p-4">
-                {/* Channel strips */}
-                {channels.map((channel) => (
-                    <div key={channel.id} className="w-[160px] shrink-0">
-                        <ChannelStrip
-                            channel={channel}
-                            onVolumeChange={(bus, v) =>
-                                handleVolumeChange(channel.id, bus, v)
-                            }
-                            onMuteToggle={(bus) =>
-                                handleMuteToggle(channel.id, bus)
-                            }
-                            onInputDeviceChange={(value) =>
-                                handleInputDeviceChange(channel.id, value)
-                            }
-                            onApplicationsChange={(apps) =>
-                                handleApplicationsChange(channel.id, apps)
-                            }
-                        />
-                    </div>
-                ))}
+                {/* Channel strips with drag-and-drop */}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={channels.map((ch) => ch.id)}
+                        strategy={horizontalListSortingStrategy}
+                    >
+                        {channels.map((channel) => (
+                            <div
+                                key={channel.id}
+                                className="w-[160px] shrink-0"
+                            >
+                                <ChannelStrip
+                                    channel={channel}
+                                    onVolumeChange={(bus, v) =>
+                                        handleVolumeChange(channel.id, bus, v)
+                                    }
+                                    onMuteToggle={(bus) =>
+                                        handleMuteToggle(channel.id, bus)
+                                    }
+                                    onInputDeviceChange={(value) =>
+                                        handleInputDeviceChange(
+                                            channel.id,
+                                            value,
+                                        )
+                                    }
+                                    onApplicationsChange={(apps) =>
+                                        handleApplicationsChange(
+                                            channel.id,
+                                            apps,
+                                        )
+                                    }
+                                    onDelete={() =>
+                                        handleDeleteChannel(channel.id)
+                                    }
+                                />
+                            </div>
+                        ))}
+                    </SortableContext>
+                </DndContext>
 
-                {/* Add channel button */}
+                {/* Add channel button - always at the end */}
                 {!allPresetsUsed && (
                     <button
                         type="button"
                         onClick={() => setAddModalOpen(true)}
-                        className="flex w-[160px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                        className="flex w-[160px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground"
                     >
                         <div className="flex size-9 items-center justify-center rounded-xl bg-muted">
                             <PlusIcon className="size-4" />

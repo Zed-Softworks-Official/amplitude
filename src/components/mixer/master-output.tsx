@@ -40,7 +40,7 @@ export function MasterOutput({
         <div className="flex h-full flex-col items-center gap-3 rounded-2xl border border-border bg-card p-3">
             {/* Label + icon */}
             <div className="flex flex-col items-center gap-1.5">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
                     {icon}
                 </div>
                 <span className="text-[11px] font-medium text-muted-foreground">
