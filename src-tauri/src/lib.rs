@@ -14,6 +14,10 @@ pub fn run() {
 
             if let Ok(config) = config {
                 state = AppState::from_config(config);
+            } else {
+                println!("no config found, creating new one");
+                let config = Config::new(state.clone());
+                let _ = config.save();
             }
 
             app.manage(Mutex::new(state));

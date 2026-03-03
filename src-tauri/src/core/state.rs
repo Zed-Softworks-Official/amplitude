@@ -1,7 +1,7 @@
 use crate::core::{
     bus::Bus,
     channels::{Channel, Send},
-    config::Config
+    config::Config,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -9,7 +9,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub channels: HashMap<Uuid, Channel>,
-    pub busses: HashMap<Uuid, Bus>,
+    pub buses: HashMap<Uuid, Bus>,
     pub default_sends: Vec<Send>,
 }
 
@@ -28,7 +28,7 @@ impl AppState {
 
         Self {
             channels: HashMap::from([(mic_channel.id, mic_channel)]),
-            busses: HashMap::from([
+            buses: HashMap::from([
                 (monitor_bus.id, monitor_bus),
                 (stream_bus.id, stream_bus),
             ]),
@@ -38,9 +38,30 @@ impl AppState {
 
     pub fn from_config(config: Config) -> Self {
         let mut state = Self::default();
+        state.channels.clear();
 
+        // Construct default sends
+        let mut default_sends = Vec::new();
+        for bus in state.buses.values() {
+            default_sends.push(Send::new(bus.id, bus.volume, bus.muted));
+        }
+        state.default_sends = default_sends;
+
+        // Add channels from config
         for (_id, channel) in config.channels {
             state.add_channel(channel);
+        }
+
+        if state.channels.is_empty() {
+            state.add_channel(Channel::new(
+                "mic".to_string(),
+                state.default_sends.clone(),
+            ));
+        }
+
+        // Add buses from config
+        for (_id, bus) in config.buses {
+            state.buses.insert(bus.id, bus);
         }
 
         state

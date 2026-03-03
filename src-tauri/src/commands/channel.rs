@@ -8,7 +8,8 @@ pub fn add_channel(
     name: String,
 ) -> Result<Channel, String> {
     println!("new channel: {:?}", name.clone());
-    let mut state = state.lock().unwrap();
+    let mut state =
+        state.lock().map_err(|_| "state lock poisend".to_string())?;
 
     let sends = state.default_sends.clone();
     let new_channel = Channel::new(name, sends);
@@ -18,8 +19,10 @@ pub fn add_channel(
     Ok(new_channel)
 }
 
-pub fn get_channels(state: tauri::State<'_, Mutex<AppState>>) -> Vec<Channel> {
-    let state = state.lock().unwrap();
-    state.channels.values().cloned().collect()
+#[tauri::command]
+pub fn get_channels(
+    state: tauri::State<'_, Mutex<AppState>>,
+) -> Result<Vec<Channel>, String> {
+    let state = state.lock().map_err(|_| "state lock poisend".to_string())?;
+    Ok(state.channels.values().cloned().collect())
 }
-
