@@ -10,6 +10,8 @@ import { ChannelIcon } from './channel-icon'
 import type { ChannelId } from './types'
 import { ADDABLE_CHANNEL_IDS, CHANNEL_PRESETS } from './types'
 
+import { invoke } from '@tauri-apps/api/core'
+
 interface AddChannelModalProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -49,6 +51,9 @@ export function AddChannelModal({
                                 onClick={() => {
                                     onAddChannel(id)
                                     onOpenChange(false)
+                                    invoke('add_channel', {
+                                        name: preset.name,
+                                    })
                                 }}
                                 className={cn(
                                     'flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left text-sm font-medium transition-colors',
