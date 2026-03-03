@@ -9,15 +9,19 @@ use core::{AppState, Config};
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let config = Config::load();
             let mut state = AppState::default();
 
-            if let Ok(config) = config {
-                state = AppState::from_config(config);
-            } else {
-                println!("no config found, creating new one");
-                let config = Config::new(state.clone());
-                let _ = config.save();
+            match Config::load() {
+                Ok(config) => state = AppState::from_config(config),
+                Err(err) if err.to_string() == "config not found" => {
+                    println!("no config found, creating new one");
+                    Config::new(state.clone()).save().map_err(|e| {
+                        format!("failed to save initial config: {e}")
+                    })?;
+                }
+                Err(err) => {
+                    return Err(format!("failed to load config: {err}").into())
+                }
             }
 
             app.manage(Mutex::new(state));
