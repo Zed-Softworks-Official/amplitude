@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct Bus {
     pub id: Uuid,
     pub name: String,

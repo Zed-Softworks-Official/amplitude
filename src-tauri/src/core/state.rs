@@ -1,10 +1,12 @@
 use crate::core::{
     bus::Bus,
     channels::{Channel, Send},
+    config::Config
 };
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct AppState {
     pub channels: HashMap<Uuid, Channel>,
     pub busses: HashMap<Uuid, Bus>,
@@ -32,6 +34,16 @@ impl AppState {
             ]),
             default_sends,
         }
+    }
+
+    pub fn from_config(config: Config) -> Self {
+        let mut state = Self::default();
+
+        for (_id, channel) in config.channels {
+            state.add_channel(channel);
+        }
+
+        state
     }
 
     pub fn add_channel(&mut self, channel: Channel) {

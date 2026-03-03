@@ -1,20 +1,29 @@
-pub mod core;
 pub mod commands;
+pub mod core;
 
 use std::sync::Mutex;
 use tauri::Manager;
 
-use core::AppState;
+use core::{AppState, Config};
 
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            app.manage(Mutex::new(AppState::default()));
+            let config = Config::load();
+            let mut state = AppState::default();
+
+            if let Ok(config) = config {
+                state = AppState::from_config(config);
+            }
+
+            app.manage(Mutex::new(state));
 
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![commands::channel::add_channel])
+        .invoke_handler(tauri::generate_handler![
+            commands::channel::add_channel
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
