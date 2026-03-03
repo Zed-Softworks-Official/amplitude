@@ -21,8 +21,6 @@ import { MasterOutput } from './master-output'
 import type { Bus, Channel, ChannelId } from './types'
 import { ADDABLE_CHANNEL_IDS, CHANNEL_PRESETS } from './types'
 
-import { invoke } from '@tauri-apps/api/core'
-
 function createChannel(id: ChannelId): Channel {
     const preset = CHANNEL_PRESETS[id]
     return {
@@ -40,7 +38,7 @@ function createChannel(id: ChannelId): Channel {
 
 export function MixerApp() {
     // Mic is always present and first
-    const [channels, setChannels] = useState<Channel[]>([createChannel('mic')])
+    const [channels, setChannels] = useState<Channel[]>([])
     const [addModalOpen, setAddModalOpen] = useState(false)
 
     // Master outputs with output device selection

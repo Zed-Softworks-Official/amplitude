@@ -3,7 +3,9 @@
 
 fn main() {
     // TODO: Find a fix for this on wayland
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    if cfg!(target_os = "linux") {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    }
 
     amplitude_lib::run()
 }

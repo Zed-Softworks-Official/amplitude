@@ -2,7 +2,7 @@ pub mod commands;
 pub mod core;
 
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{tray::TrayIconBuilder, Manager};
 
 use core::{AppState, Config};
 
@@ -11,6 +11,7 @@ pub fn run() {
         .setup(|app| {
             let mut state = AppState::default();
 
+            // App State and Config Loading
             match Config::load() {
                 Ok(config) => state = AppState::from_config(config),
                 Err(err) if err.to_string() == "config not found" => {
@@ -26,11 +27,37 @@ pub fn run() {
 
             app.manage(Mutex::new(state));
 
+            // Tray icon
+            let quit = tauri::menu::MenuItem::with_id(
+                app,
+                "quit",
+                "Quit",
+                true,
+                None::<&str>,
+            )?;
+
+            let menu = tauri::menu::Menu::with_items(app, &[&quit])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::channel::add_channel
+            // Channels
+            commands::channel::add_channel,
+            commands::channel::get_channels,
+            // Buses
+            commands::bus::get_buses,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
