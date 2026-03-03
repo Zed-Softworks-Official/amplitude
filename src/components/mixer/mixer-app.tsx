@@ -37,7 +37,6 @@ function createChannel(id: ChannelId): Channel {
 }
 
 export function MixerApp() {
-    // Mic is always present and first
     const [channels, setChannels] = useState<Channel[]>([])
     const [addModalOpen, setAddModalOpen] = useState(false)
 
