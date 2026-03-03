@@ -5,6 +5,7 @@ pub struct Channel {
     pub id: Uuid,
     pub name: String,
     pub sends: Vec<Send>,
+    pub connections: Vec<Connection>,
 }
 
 impl Channel {
@@ -13,13 +14,9 @@ impl Channel {
             id: Uuid::new_v4(),
             name,
             sends,
+            connections: Vec::new(),
         }
     }
-}
-
-#[tauri::command]
-pub fn add_channel() {
-    println!("add_channel");
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +32,21 @@ impl Send {
             bus_id,
             volume,
             muted,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Connection {
+    pub process_id: u32,
+    pub process_name: String,
+}
+
+impl Connection {
+    pub fn new(process_id: u32, process_name: String) -> Self {
+        Self {
+            process_id,
+            process_name,
         }
     }
 }

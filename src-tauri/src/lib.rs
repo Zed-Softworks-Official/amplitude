@@ -1,13 +1,14 @@
-mod bus;
-mod channels;
+pub mod core;
+pub mod commands;
 
+use std::{collections::HashMap, sync::Mutex};
 use tauri::Manager;
 use uuid::Uuid;
 
-use std::{collections::HashMap, sync::Mutex};
-
-use bus::Bus;
-use channels::{Channel, Send};
+use core::{
+    bus::Bus,
+    channels::{Channel, Send},
+};
 
 pub struct AppState {
     pub channels: HashMap<Uuid, Channel>,
@@ -45,7 +46,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![channels::add_channel])
+        .invoke_handler(tauri::generate_handler![commands::channel::add_channel])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

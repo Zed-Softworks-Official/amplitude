@@ -51,7 +51,9 @@ export function AddChannelModal({
                                 onClick={() => {
                                     onAddChannel(id)
                                     onOpenChange(false)
-                                    invoke('add_channel')
+                                    invoke('add_channel', {
+                                        name: preset.name,
+                                    })
                                 }}
                                 className={cn(
                                     'flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left text-sm font-medium transition-colors',
