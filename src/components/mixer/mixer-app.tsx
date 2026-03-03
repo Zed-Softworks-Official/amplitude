@@ -21,6 +21,8 @@ import { MasterOutput } from './master-output'
 import type { Bus, Channel, ChannelId } from './types'
 import { ADDABLE_CHANNEL_IDS, CHANNEL_PRESETS } from './types'
 
+import { invoke } from '@tauri-apps/api/core'
+
 function createChannel(id: ChannelId): Channel {
     const preset = CHANNEL_PRESETS[id]
     return {
