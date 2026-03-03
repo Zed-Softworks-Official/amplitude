@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
     pub id: Uuid,
     pub name: String,
@@ -19,7 +20,7 @@ impl Channel {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Send {
     pub bus_id: Uuid,
     pub volume: f32,
@@ -36,7 +37,7 @@ impl Send {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Connection {
     pub process_id: u32,
     pub process_name: String,
