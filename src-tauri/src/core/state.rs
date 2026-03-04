@@ -68,11 +68,15 @@ impl AppState {
         }
         state.default_sends = default_sends;
 
-        // Add channels from config in persisted order
+        // Add channels from config in persisted order, guarding against duplicate IDs
+        // in the stored config.channel_order.
+        let mut seen = std::collections::HashSet::new();
         for id in &config.channel_order {
-            if let Some(channel) = config.channels.get(id) {
-                state.channels.insert(channel.id, channel.clone());
-                state.channel_order.push(*id);
+            if seen.insert(*id) {
+                if let Some(channel) = config.channels.get(id) {
+                    state.channels.insert(channel.id, channel.clone());
+                    state.channel_order.push(*id);
+                }
             }
         }
 
@@ -84,8 +88,15 @@ impl AppState {
             }
         }
 
-        if state.channels.is_empty() {
-            let mic = Channel::new("mic".to_string(), state.default_sends.clone());
+        // Ensure the mic channel is always present regardless of what the config contained.
+        // Use the same case-insensitive check as delete_channel so the invariant is consistent.
+        let has_mic = state
+            .channels
+            .values()
+            .any(|ch| ch.name.to_lowercase() == "mic");
+        if !has_mic {
+            let mic =
+                Channel::new("mic".to_string(), state.default_sends.clone());
             let mic_id = mic.id;
             state.channels.insert(mic_id, mic);
             state.channel_order.push(mic_id);
@@ -102,11 +113,19 @@ impl AppState {
         }
     }
 
-    /// Returns channels in their persisted order.
+    /// Returns channels in their persisted order, skipping any duplicate IDs so
+    /// a corrupt or untrusted `channel_order` never yields duplicate entries.
     pub fn ordered_channels(&self) -> Vec<Channel> {
+        let mut seen = std::collections::HashSet::new();
         self.channel_order
             .iter()
-            .filter_map(|id| self.channels.get(id).cloned())
+            .filter_map(|id| {
+                if seen.insert(*id) {
+                    self.channels.get(id).cloned()
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 

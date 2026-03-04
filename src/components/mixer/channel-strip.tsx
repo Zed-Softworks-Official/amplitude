@@ -61,6 +61,7 @@ function BusColumn({
     label,
     volume,
     muted,
+    disabled = false,
     onVolumeChange,
     onMuteToggle,
 }: {
@@ -68,13 +69,15 @@ function BusColumn({
     /** Display value 0–100 */
     volume: number
     muted: boolean
+    /** True when no send mapping exists for this bus; disables all controls. */
+    disabled?: boolean
     onVolumeChange: (displayVolume: number) => void
     onMuteToggle: () => void
 }) {
     const meterValue = muted ? 0 : volume * 0.85
 
     return (
-        <div className="flex flex-1 flex-col items-center gap-2">
+        <div className={cn('flex flex-1 flex-col items-center gap-2', disabled && 'opacity-40')}>
             <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {label}
             </span>
@@ -88,6 +91,7 @@ function BusColumn({
                     value={[volume]}
                     onValueChange={(v) => onVolumeChange(v[0])}
                     className="h-full"
+                    disabled={disabled}
                 />
             </div>
 
@@ -99,6 +103,7 @@ function BusColumn({
                 variant={muted ? 'default' : 'ghost'}
                 size="icon-xs"
                 onClick={onMuteToggle}
+                disabled={disabled}
                 className={cn(
                     'shrink-0',
                     muted &&
@@ -232,10 +237,9 @@ export function ChannelStrip({
                                 label={bus.name.slice(0, 3).toUpperCase()}
                                 volume={displayVolume}
                                 muted={muted}
-                                onVolumeChange={(v) =>
-                                    onVolumeChange(bus.id, v)
-                                }
-                                onMuteToggle={() => onMuteToggle(bus.id, muted)}
+                                disabled={!send}
+                                onVolumeChange={send ? (v) => onVolumeChange(bus.id, v) : () => {}}
+                                onMuteToggle={send ? () => onMuteToggle(bus.id, muted) : () => {}}
                             />
                         </div>
                     )

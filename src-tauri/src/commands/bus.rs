@@ -1,22 +1,28 @@
-use crate::core::{bus::Bus, config::Config, AppState};
+use crate::core::{config::Config, AppState, AppStatePayload, Bus};
 use std::sync::Mutex;
 use tauri::Emitter;
 use uuid::Uuid;
 
-fn emit_and_save(app: &tauri::AppHandle, state: &AppState) {
-    if let Err(e) = app.emit("appstate-changed", state.to_payload()) {
-        eprintln!("failed to emit appstate-changed: {e}");
-    }
-    if let Err(e) = Config::new(state.clone()).save() {
-        eprintln!("failed to save config: {e}");
-    }
+fn emit_and_save(
+    app: &tauri::AppHandle,
+    payload: AppStatePayload,
+    config: Config,
+) -> Result<(), String> {
+    app.emit("appstate-changed", payload)
+        .map_err(|e| format!("failed to emit appstate-changed: {e}"))?;
+    config
+        .save()
+        .map_err(|e| format!("failed to save config: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
 pub fn get_buses(
     state: tauri::State<'_, Mutex<AppState>>,
 ) -> Result<Vec<Bus>, String> {
-    let state = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let state = state
+        .lock()
+        .map_err(|_| "state lock poisoned".to_string())?;
     Ok(state.buses.values().cloned().collect())
 }
 
@@ -28,20 +34,26 @@ pub fn update_bus(
     volume: Option<f32>,
     muted: Option<bool>,
 ) -> Result<(), String> {
-    let mut state = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let (payload, config) = {
+        let mut state = state
+            .lock()
+            .map_err(|_| "state lock poisoned".to_string())?;
 
-    let bus = state
-        .buses
-        .get_mut(&bus_id)
-        .ok_or_else(|| format!("bus {bus_id} not found"))?;
+        let bus = state
+            .buses
+            .get_mut(&bus_id)
+            .ok_or_else(|| format!("bus {bus_id} not found"))?;
 
-    if let Some(v) = volume {
-        bus.volume = v.clamp(0.0, 1.0);
-    }
-    if let Some(m) = muted {
-        bus.muted = m;
-    }
+        if let Some(v) = volume {
+            bus.volume = v.clamp(0.0, 1.0);
+        }
+        if let Some(m) = muted {
+            bus.muted = m;
+        }
 
-    emit_and_save(&app, &state);
-    Ok(())
+        (state.to_payload(), Config::new(state.clone()))
+        // mutex guard dropped here
+    };
+
+    emit_and_save(&app, payload, config)
 }

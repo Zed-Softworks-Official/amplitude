@@ -74,6 +74,9 @@ export function MixerApp() {
         const oldIndex = channels.findIndex((ch) => ch.id === active.id)
         const newIndex = channels.findIndex((ch) => ch.id === over.id)
 
+        // Guard against stale drag IDs that are no longer in the channel list.
+        if (oldIndex === -1 || newIndex === -1) return
+
         // Prevent moving mic (index 0) or moving anything to index 0
         if (oldIndex === 0 || newIndex === 0) return
 

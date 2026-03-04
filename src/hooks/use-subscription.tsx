@@ -8,12 +8,26 @@ export function useSubscription<T>(event: string, callback: (data: T) => void) {
     callbackRef.current = callback
 
     useEffect(() => {
-        let unlisten: UnlistenFn
+        let unlisten: UnlistenFn | undefined
+        let cancelled = false
 
-        listen<T>(event, (e) => callbackRef.current(e.payload)).then((fn) => {
-            unlisten = fn
-        })
+        listen<T>(event, (e) => callbackRef.current(e.payload))
+            .then((fn) => {
+                if (cancelled) {
+                    // Cleanup already ran before the promise resolved; immediately
+                    // remove the listener so it never fires.
+                    fn()
+                } else {
+                    unlisten = fn
+                }
+            })
+            .catch((err: unknown) => {
+                console.error(`[useSubscription] failed to subscribe to "${event}":`, err)
+            })
 
-        return () => unlisten?.()
+        return () => {
+            cancelled = true
+            unlisten?.()
+        }
     }, [event])
 }
