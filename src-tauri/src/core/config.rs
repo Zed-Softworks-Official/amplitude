@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub struct Config {
     pub channels: HashMap<Uuid, Channel>,
     pub buses: HashMap<Uuid, Bus>,
+    pub channel_order: Vec<Uuid>,
 }
 
 impl Config {
@@ -15,6 +16,7 @@ impl Config {
         Self {
             channels: state.channels.clone(),
             buses: state.buses.clone(),
+            channel_order: state.channel_order.clone(),
         }
     }
 

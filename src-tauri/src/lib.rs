@@ -56,8 +56,13 @@ pub fn run() {
             // Channels
             commands::channel::add_channel,
             commands::channel::get_channels,
+            commands::channel::delete_channel,
+            commands::channel::reorder_channels,
+            commands::channel::update_channel_send,
+            commands::channel::update_channel_connections,
             // Buses
             commands::bus::get_buses,
+            commands::bus::update_bus,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

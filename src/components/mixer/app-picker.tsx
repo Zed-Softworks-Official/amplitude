@@ -6,7 +6,16 @@ import {
     PopoverTrigger,
 } from '~/components/ui/popover'
 import { cn } from '~/lib/utils'
-import { APPLICATIONS } from './types'
+
+// Placeholder application list until backend provides a real process list
+const APPLICATIONS = [
+    'Chrome',
+    'Spotify',
+    'Discord',
+    'Game.exe',
+    'OBS Studio',
+    'Firefox',
+]
 
 interface AppPickerProps {
     selected: string[]

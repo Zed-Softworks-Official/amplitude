@@ -13,51 +13,56 @@ import {
     SortableContext,
 } from '@dnd-kit/sortable'
 import { PlusIcon, RadioIcon, SpeakerIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Separator } from '~/components/ui/separator'
+import { useSubscription } from '~/hooks/use-subscription'
+import {
+    deleteChannel,
+    getBuses,
+    getChannels,
+    reorderChannels,
+    type AppStatePayload,
+    updateBus,
+    updateChannelConnections,
+    updateChannelSend,
+} from '~/lib/tauri-api'
+import type { Bus, Channel } from '~/lib/types'
 import { AddChannelModal } from './add-channel-modal'
 import { ChannelStrip } from './channel-strip'
 import { MasterOutput } from './master-output'
-import type { Bus, Channel, ChannelId } from './types'
-import { ADDABLE_CHANNEL_IDS, CHANNEL_PRESETS } from './types'
-
-function createChannel(id: ChannelId): Channel {
-    const preset = CHANNEL_PRESETS[id]
-    return {
-        id,
-        name: preset.name,
-        icon: preset.icon,
-        monitorVolume: 75,
-        streamVolume: 75,
-        monitorMuted: false,
-        streamMuted: false,
-        inputDevice: id === 'mic' ? 'Default Input' : undefined,
-        applications: [],
-    }
-}
 
 export function MixerApp() {
     const [channels, setChannels] = useState<Channel[]>([])
+    const [buses, setBuses] = useState<Bus[]>([])
     const [addModalOpen, setAddModalOpen] = useState(false)
 
-    // Master outputs with output device selection
-    const [monitor, setMonitor] = useState({
-        volume: 80,
-        muted: false,
-        outputDevice: 'Default Output',
-    })
-    const [stream, setStream] = useState({
-        volume: 80,
-        muted: false,
-        outputDevice: 'Default Output',
-    })
+    // ---------------------------------------------------------------------------
+    // Initial load
+    // ---------------------------------------------------------------------------
 
-    // dnd-kit sensors
+    useEffect(() => {
+        getChannels().then(setChannels).catch(console.error)
+        getBuses().then(setBuses).catch(console.error)
+    }, [])
+
+    // ---------------------------------------------------------------------------
+    // Live updates via Tauri event
+    // ---------------------------------------------------------------------------
+
+    const handleAppStateChanged = useCallback((payload: AppStatePayload) => {
+        setChannels(payload.channels)
+        setBuses(payload.buses)
+    }, [])
+
+    useSubscription<AppStatePayload>('appstate-changed', handleAppStateChanged)
+
+    // ---------------------------------------------------------------------------
+    // DnD
+    // ---------------------------------------------------------------------------
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
+            activationConstraint: { distance: 8 },
         }),
         useSensor(KeyboardSensor),
     )
@@ -69,70 +74,63 @@ export function MixerApp() {
         const oldIndex = channels.findIndex((ch) => ch.id === active.id)
         const newIndex = channels.findIndex((ch) => ch.id === over.id)
 
-        // Prevent moving Mic (index 0) or moving anything to index 0
+        // Prevent moving mic (index 0) or moving anything to index 0
         if (oldIndex === 0 || newIndex === 0) return
 
-        setChannels((prev) => arrayMove(prev, oldIndex, newIndex))
+        const reordered = arrayMove(channels, oldIndex, newIndex)
+        setChannels(reordered)
+        reorderChannels(reordered.map((ch) => ch.id)).catch(console.error)
     }
 
-    const handleVolumeChange = (id: ChannelId, bus: Bus, value: number) => {
-        setChannels((prev) =>
-            prev.map((ch) => {
-                if (ch.id !== id) return ch
-                if (bus === 'monitor') return { ...ch, monitorVolume: value }
-                return { ...ch, streamVolume: value }
-            }),
+    // ---------------------------------------------------------------------------
+    // Handlers
+    // ---------------------------------------------------------------------------
+
+    const handleVolumeChange = (
+        channelId: string,
+        busId: string,
+        displayVolume: number,
+    ) => {
+        updateChannelSend(channelId, busId, { volume: displayVolume }).catch(
+            console.error,
         )
     }
 
-    const handleMuteToggle = (id: ChannelId, bus: Bus) => {
-        setChannels((prev) =>
-            prev.map((ch) => {
-                if (ch.id !== id) return ch
-                if (bus === 'monitor')
-                    return { ...ch, monitorMuted: !ch.monitorMuted }
-                return { ...ch, streamMuted: !ch.streamMuted }
-            }),
+    const handleMuteToggle = (channelId: string, busId: string, currentMuted: boolean) => {
+        updateChannelSend(channelId, busId, { muted: !currentMuted }).catch(
+            console.error,
         )
     }
 
-    const handleInputDeviceChange = (id: ChannelId, value: string) => {
-        setChannels((prev) =>
-            prev.map((ch) => {
-                if (ch.id !== id) return ch
-                return { ...ch, inputDevice: value }
-            }),
-        )
+    const handleConnectionsChange = (channelId: string, processNames: string[]) => {
+        updateChannelConnections(channelId, processNames).catch(console.error)
     }
 
-    const handleApplicationsChange = (id: ChannelId, apps: string[]) => {
-        setChannels((prev) =>
-            prev.map((ch) => {
-                if (ch.id !== id) return ch
-                return { ...ch, applications: apps }
-            }),
-        )
+    const handleDeleteChannel = (id: string) => {
+        deleteChannel(id).catch(console.error)
     }
 
-    const handleAddChannel = (id: ChannelId) => {
-        setChannels((prev) => [...prev, createChannel(id)])
+    const handleBusVolumeChange = (busId: string, displayVolume: number) => {
+        updateBus(busId, { volume: displayVolume }).catch(console.error)
     }
 
-    const handleDeleteChannel = (id: ChannelId) => {
-        if (id === 'mic') return
-        setChannels((prev) => prev.filter((ch) => ch.id !== id))
+    const handleBusMuteToggle = (busId: string, currentMuted: boolean) => {
+        updateBus(busId, { muted: !currentMuted }).catch(console.error)
     }
 
-    const existingIds = channels.map((ch) => ch.id)
-    const allPresetsUsed = ADDABLE_CHANNEL_IDS.every((id) =>
-        existingIds.includes(id),
-    )
+    // ---------------------------------------------------------------------------
+    // Derived state
+    // ---------------------------------------------------------------------------
+
+    const monitorBus = buses.find((b) => b.name === 'monitor')
+    const streamBus = buses.find((b) => b.name === 'stream')
+
+    const existingChannelNames = channels.map((ch) => ch.name)
 
     return (
         <div className="flex h-screen w-screen overflow-hidden">
             {/* Channel area */}
             <main className="flex flex-1 items-stretch gap-3 overflow-x-auto p-4">
-                {/* Channel strips with drag-and-drop */}
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -149,23 +147,15 @@ export function MixerApp() {
                             >
                                 <ChannelStrip
                                     channel={channel}
-                                    onVolumeChange={(bus, v) =>
-                                        handleVolumeChange(channel.id, bus, v)
+                                    buses={buses}
+                                    onVolumeChange={(busId, v) =>
+                                        handleVolumeChange(channel.id, busId, v)
                                     }
-                                    onMuteToggle={(bus) =>
-                                        handleMuteToggle(channel.id, bus)
+                                    onMuteToggle={(busId, muted) =>
+                                        handleMuteToggle(channel.id, busId, muted)
                                     }
-                                    onInputDeviceChange={(value) =>
-                                        handleInputDeviceChange(
-                                            channel.id,
-                                            value,
-                                        )
-                                    }
-                                    onApplicationsChange={(apps) =>
-                                        handleApplicationsChange(
-                                            channel.id,
-                                            apps,
-                                        )
+                                    onConnectionsChange={(names) =>
+                                        handleConnectionsChange(channel.id, names)
                                     }
                                     onDelete={() =>
                                         handleDeleteChannel(channel.id)
@@ -176,72 +166,55 @@ export function MixerApp() {
                     </SortableContext>
                 </DndContext>
 
-                {/* Add channel button - always at the end */}
-                {!allPresetsUsed && (
-                    <button
-                        type="button"
-                        onClick={() => setAddModalOpen(true)}
-                        className="flex w-[160px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground"
-                    >
-                        <div className="flex size-9 items-center justify-center rounded-xl bg-muted">
-                            <PlusIcon className="size-4" />
-                        </div>
-                        <span className="text-xs font-medium">Add Channel</span>
-                    </button>
-                )}
+                {/* Add channel button */}
+                <button
+                    type="button"
+                    onClick={() => setAddModalOpen(true)}
+                    className="flex w-[160px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-accent/30 hover:text-foreground"
+                >
+                    <div className="flex size-9 items-center justify-center rounded-xl bg-muted">
+                        <PlusIcon className="size-4" />
+                    </div>
+                    <span className="text-xs font-medium">Add Channel</span>
+                </button>
             </main>
 
-            {/* Separator */}
             <Separator orientation="vertical" />
 
             {/* Master outputs */}
             <aside className="flex shrink-0 items-stretch gap-3 p-4">
-                <MasterOutput
-                    label="Monitor"
-                    icon={<SpeakerIcon className="size-3.5" />}
-                    volume={monitor.volume}
-                    muted={monitor.muted}
-                    outputDevice={monitor.outputDevice}
-                    onVolumeChange={(v) =>
-                        setMonitor((prev) => ({ ...prev, volume: v }))
-                    }
-                    onMuteToggle={() =>
-                        setMonitor((prev) => ({
-                            ...prev,
-                            muted: !prev.muted,
-                        }))
-                    }
-                    onOutputDeviceChange={(v) =>
-                        setMonitor((prev) => ({ ...prev, outputDevice: v }))
-                    }
-                />
-                <MasterOutput
-                    label="Stream"
-                    icon={<RadioIcon className="size-3.5" />}
-                    volume={stream.volume}
-                    muted={stream.muted}
-                    outputDevice={stream.outputDevice}
-                    onVolumeChange={(v) =>
-                        setStream((prev) => ({ ...prev, volume: v }))
-                    }
-                    onMuteToggle={() =>
-                        setStream((prev) => ({
-                            ...prev,
-                            muted: !prev.muted,
-                        }))
-                    }
-                    onOutputDeviceChange={(v) =>
-                        setStream((prev) => ({ ...prev, outputDevice: v }))
-                    }
-                />
+                {monitorBus && (
+                    <MasterOutput
+                        label="Monitor"
+                        icon={<SpeakerIcon className="size-3.5" />}
+                        bus={monitorBus}
+                        onVolumeChange={(v) =>
+                            handleBusVolumeChange(monitorBus.id, v)
+                        }
+                        onMuteToggle={() =>
+                            handleBusMuteToggle(monitorBus.id, monitorBus.muted)
+                        }
+                    />
+                )}
+                {streamBus && (
+                    <MasterOutput
+                        label="Stream"
+                        icon={<RadioIcon className="size-3.5" />}
+                        bus={streamBus}
+                        onVolumeChange={(v) =>
+                            handleBusVolumeChange(streamBus.id, v)
+                        }
+                        onMuteToggle={() =>
+                            handleBusMuteToggle(streamBus.id, streamBus.muted)
+                        }
+                    />
+                )}
             </aside>
 
-            {/* Add channel modal */}
             <AddChannelModal
                 open={addModalOpen}
                 onOpenChange={setAddModalOpen}
-                existingChannelIds={existingIds}
-                onAddChannel={handleAddChannel}
+                existingChannelNames={existingChannelNames}
             />
         </div>
     )

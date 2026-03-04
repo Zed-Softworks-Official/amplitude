@@ -5,5 +5,5 @@ pub mod state;
 
 pub use channels::{Channel, Connection, Send};
 pub use bus::Bus;
-pub use state::AppState;
+pub use state::{AppState, AppStatePayload};
 pub use config::Config;
