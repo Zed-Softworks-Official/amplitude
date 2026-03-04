@@ -185,7 +185,8 @@ export function ChannelStrip({
                     <ChannelIcon name={channel.name} className="size-3.5" />
                 </div>
                 <span className="text-[11px] font-medium text-muted-foreground">
-                    {channel.name}
+                    {channel.name.slice(0, 1).toUpperCase() +
+                        channel.name.slice(1)}
                 </span>
             </div>
 
@@ -234,9 +235,7 @@ export function ChannelStrip({
                                 onVolumeChange={(v) =>
                                     onVolumeChange(bus.id, v)
                                 }
-                                onMuteToggle={() =>
-                                    onMuteToggle(bus.id, muted)
-                                }
+                                onMuteToggle={() => onMuteToggle(bus.id, muted)}
                             />
                         </div>
                     )
