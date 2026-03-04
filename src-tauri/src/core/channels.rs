@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: Uuid,
     pub name: String,
@@ -21,6 +22,7 @@ impl Channel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Send {
     pub bus_id: Uuid,
     pub volume: f32,
@@ -38,6 +40,7 @@ impl Send {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub process_id: u32,
     pub process_name: String,

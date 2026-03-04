@@ -34,18 +34,26 @@ import {
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
 import { cn } from '~/lib/utils'
+import { toDisplay } from '~/lib/tauri-api'
+import type { Bus, Channel } from '~/lib/types'
 import { AppPicker } from './app-picker'
 import { ChannelIcon } from './channel-icon'
 import { Meter } from './meter'
-import type { Bus, Channel } from './types'
-import { INPUT_DEVICES } from './types'
+
+// Placeholder input devices until backend provides them
+const INPUT_DEVICES = [
+    'Default Input',
+    'USB Microphone',
+    'Line In',
+    'Webcam Mic',
+]
 
 interface ChannelStripProps {
     channel: Channel
-    onVolumeChange: (bus: Bus, value: number) => void
-    onMuteToggle: (bus: Bus) => void
-    onInputDeviceChange: (value: string) => void
-    onApplicationsChange: (apps: string[]) => void
+    buses: Bus[]
+    onVolumeChange: (busId: string, displayVolume: number) => void
+    onMuteToggle: (busId: string, currentMuted: boolean) => void
+    onConnectionsChange: (processNames: string[]) => void
     onDelete?: () => void
 }
 
@@ -53,25 +61,27 @@ function BusColumn({
     label,
     volume,
     muted,
+    disabled = false,
     onVolumeChange,
     onMuteToggle,
 }: {
     label: string
+    /** Display value 0–100 */
     volume: number
     muted: boolean
-    onVolumeChange: (value: number) => void
+    /** True when no send mapping exists for this bus; disables all controls. */
+    disabled?: boolean
+    onVolumeChange: (displayVolume: number) => void
     onMuteToggle: () => void
 }) {
     const meterValue = muted ? 0 : volume * 0.85
 
     return (
-        <div className="flex flex-1 flex-col items-center gap-2">
-            {/* Bus label */}
+        <div className={cn('flex flex-1 flex-col items-center gap-2', disabled && 'opacity-40')}>
             <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {label}
             </span>
 
-            {/* Meter + Slider */}
             <div className="flex flex-1 items-center gap-1.5">
                 <Meter value={meterValue} />
                 <Slider
@@ -81,19 +91,19 @@ function BusColumn({
                     value={[volume]}
                     onValueChange={(v) => onVolumeChange(v[0])}
                     className="h-full"
+                    disabled={disabled}
                 />
             </div>
 
-            {/* Volume readout */}
             <span className="text-[9px] font-medium tabular-nums text-muted-foreground">
                 {muted ? '--' : volume}
             </span>
 
-            {/* Mute button */}
             <Button
                 variant={muted ? 'default' : 'ghost'}
                 size="icon-xs"
                 onClick={onMuteToggle}
+                disabled={disabled}
                 className={cn(
                     'shrink-0',
                     muted &&
@@ -112,15 +122,19 @@ function BusColumn({
 
 export function ChannelStrip({
     channel,
+    buses,
     onVolumeChange,
     onMuteToggle,
-    onInputDeviceChange,
-    onApplicationsChange,
+    onConnectionsChange,
     onDelete,
 }: ChannelStripProps) {
-    const isFullyMuted = channel.monitorMuted && channel.streamMuted
-    const isMic = channel.id === 'mic'
+    const isMic = channel.name.toLowerCase() === 'mic'
+
+    // Frontend-only local state for input device (not yet wired to backend)
+    const [inputDevice, setInputDevice] = useState('Default Input')
     const [deleteOpen, setDeleteOpen] = useState(false)
+
+    const selectedConnections = channel.connections.map((c) => c.processName)
 
     const {
         attributes,
@@ -140,6 +154,14 @@ export function ChannelStrip({
         opacity: isDragging ? 0.5 : 1,
     }
 
+    // Check if every bus send is muted
+    const isFullyMuted =
+        buses.length > 0 &&
+        buses.every((bus) => {
+            const send = channel.sends.find((s) => s.busId === bus.id)
+            return send?.muted ?? false
+        })
+
     const cardContent = (
         <div
             ref={setNodeRef}
@@ -151,14 +173,13 @@ export function ChannelStrip({
                 isDragging && 'z-50',
             )}
         >
-            {/* Drag handle - only shown for non-Mic channels */}
             {!isMic && (
                 <div className="absolute top-2 right-2 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                     <GripVerticalIcon className="size-3.5" />
                 </div>
             )}
 
-            {/* Channel icon + name */}
+            {/* Icon + name */}
             <div className="flex flex-col items-center gap-1.5">
                 <div
                     className={cn(
@@ -166,19 +187,17 @@ export function ChannelStrip({
                         !isFullyMuted && 'bg-accent/15 text-accent',
                     )}
                 >
-                    <ChannelIcon type={channel.icon} className="size-3.5" />
+                    <ChannelIcon name={channel.name} className="size-3.5" />
                 </div>
                 <span className="text-[11px] font-medium text-muted-foreground">
-                    {channel.name}
+                    {channel.name.slice(0, 1).toUpperCase() +
+                        channel.name.slice(1)}
                 </span>
             </div>
 
             {/* Routing selector */}
             {isMic ? (
-                <Select
-                    value={channel.inputDevice ?? ''}
-                    onValueChange={onInputDeviceChange}
-                >
+                <Select value={inputDevice} onValueChange={setInputDevice}>
                     <SelectTrigger
                         size="sm"
                         className="h-7 w-full gap-1 rounded-lg px-2 text-[10px]"
@@ -197,28 +216,34 @@ export function ChannelStrip({
                 </Select>
             ) : (
                 <AppPicker
-                    selected={channel.applications}
-                    onChange={onApplicationsChange}
+                    selected={selectedConnections}
+                    onChange={onConnectionsChange}
                 />
             )}
 
             {/* Dual bus columns */}
             <div className="flex w-full flex-1 gap-2">
-                <BusColumn
-                    label="MON"
-                    volume={channel.monitorVolume}
-                    muted={channel.monitorMuted}
-                    onVolumeChange={(v) => onVolumeChange('monitor', v)}
-                    onMuteToggle={() => onMuteToggle('monitor')}
-                />
-                <div className="w-px shrink-0 bg-border" />
-                <BusColumn
-                    label="STR"
-                    volume={channel.streamVolume}
-                    muted={channel.streamMuted}
-                    onVolumeChange={(v) => onVolumeChange('stream', v)}
-                    onMuteToggle={() => onMuteToggle('stream')}
-                />
+                {buses.map((bus, i) => {
+                    const send = channel.sends.find((s) => s.busId === bus.id)
+                    const displayVolume = toDisplay(send?.volume ?? 0.8)
+                    const muted = send?.muted ?? false
+
+                    return (
+                        <div key={bus.id} className="flex flex-1 gap-2">
+                            {i > 0 && (
+                                <div className="w-px shrink-0 bg-border" />
+                            )}
+                            <BusColumn
+                                label={bus.name.slice(0, 3).toUpperCase()}
+                                volume={displayVolume}
+                                muted={muted}
+                                disabled={!send}
+                                onVolumeChange={send ? (v) => onVolumeChange(bus.id, v) : () => {}}
+                                onMuteToggle={send ? () => onMuteToggle(bus.id, muted) : () => {}}
+                            />
+                        </div>
+                    )
+                })}
             </div>
         </div>
     )
@@ -244,7 +269,6 @@ export function ChannelStrip({
                 cardContent
             )}
 
-            {/* Delete confirmation dialog */}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

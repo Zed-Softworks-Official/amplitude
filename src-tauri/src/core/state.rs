@@ -3,14 +3,24 @@ use crate::core::{
     channels::{Channel, Send},
     config::Config,
 };
+use serde::Serialize;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Payload emitted on the "appstate-changed" Tauri event.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppStatePayload {
+    pub channels: Vec<Channel>,
+    pub buses: Vec<Bus>,
+}
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub channels: HashMap<Uuid, Channel>,
     pub buses: HashMap<Uuid, Bus>,
     pub default_sends: Vec<Send>,
+    pub channel_order: Vec<Uuid>,
 }
 
 impl AppState {
@@ -26,6 +36,8 @@ impl AppState {
         let mic_channel =
             Channel::new("mic".to_string(), default_sends.clone());
 
+        let mic_id = mic_channel.id;
+
         Self {
             channels: HashMap::from([(mic_channel.id, mic_channel)]),
             buses: HashMap::from([
@@ -33,6 +45,7 @@ impl AppState {
                 (stream_bus.id, stream_bus),
             ]),
             default_sends,
+            channel_order: vec![mic_id],
         }
     }
 
@@ -40,6 +53,7 @@ impl AppState {
         let mut state = Self::default();
         state.channels.clear();
         state.default_sends.clear();
+        state.channel_order.clear();
 
         // Restore persisted buses first, replacing defaults
         state.buses.clear();
@@ -54,22 +68,72 @@ impl AppState {
         }
         state.default_sends = default_sends;
 
-        // Add channels from config
-        for (_id, channel) in config.channels {
-            state.add_channel(channel);
+        // Add channels from config in persisted order, guarding against duplicate IDs
+        // in the stored config.channel_order.
+        let mut seen = std::collections::HashSet::new();
+        for id in &config.channel_order {
+            if seen.insert(*id) {
+                if let Some(channel) = config.channels.get(id) {
+                    state.channels.insert(channel.id, channel.clone());
+                    state.channel_order.push(*id);
+                }
+            }
         }
 
-        if state.channels.is_empty() {
-            state.add_channel(Channel::new(
-                "mic".to_string(),
-                state.default_sends.clone(),
-            ));
+        // Any channels not in channel_order (shouldn't happen, but be safe)
+        for (_id, channel) in &config.channels {
+            if !state.channel_order.contains(&channel.id) {
+                state.channel_order.push(channel.id);
+                state.channels.insert(channel.id, channel.clone());
+            }
+        }
+
+        // Ensure the mic channel is always present regardless of what the config contained.
+        // Use the same case-insensitive check as delete_channel so the invariant is consistent.
+        let has_mic = state
+            .channels
+            .values()
+            .any(|ch| ch.name.to_lowercase() == "mic");
+        if !has_mic {
+            let mic =
+                Channel::new("mic".to_string(), state.default_sends.clone());
+            let mic_id = mic.id;
+            state.channels.insert(mic_id, mic);
+            state.channel_order.push(mic_id);
         }
 
         state
     }
 
     pub fn add_channel(&mut self, channel: Channel) {
-        self.channels.insert(channel.id, channel);
+        let id = channel.id;
+        self.channels.insert(id, channel);
+        if !self.channel_order.contains(&id) {
+            self.channel_order.push(id);
+        }
+    }
+
+    /// Returns channels in their persisted order, skipping any duplicate IDs so
+    /// a corrupt or untrusted `channel_order` never yields duplicate entries.
+    pub fn ordered_channels(&self) -> Vec<Channel> {
+        let mut seen = std::collections::HashSet::new();
+        self.channel_order
+            .iter()
+            .filter_map(|id| {
+                if seen.insert(*id) {
+                    self.channels.get(id).cloned()
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Builds the event payload representing current state.
+    pub fn to_payload(&self) -> AppStatePayload {
+        AppStatePayload {
+            channels: self.ordered_channels(),
+            buses: self.buses.values().cloned().collect(),
+        }
     }
 }

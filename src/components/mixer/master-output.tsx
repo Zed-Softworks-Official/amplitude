@@ -1,4 +1,5 @@
 import { Volume2Icon, VolumeOffIcon } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '~/components/ui/button'
 import {
     Select,
@@ -10,31 +11,38 @@ import {
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
 import { cn } from '~/lib/utils'
+import { toDisplay } from '~/lib/tauri-api'
+import type { Bus } from '~/lib/types'
 import { Meter } from './meter'
-import { OUTPUT_DEVICES } from './types'
+
+// Placeholder output devices until backend provides them
+const OUTPUT_DEVICES = [
+    'Default Output',
+    'Headphones',
+    'Speakers',
+    'HDMI Audio',
+]
 
 interface MasterOutputProps {
     label: string
     icon: React.ReactNode
-    volume: number
-    muted: boolean
-    outputDevice: string
-    onVolumeChange: (value: number) => void
+    bus: Bus
+    onVolumeChange: (displayVolume: number) => void
     onMuteToggle: () => void
-    onOutputDeviceChange: (value: string) => void
 }
 
 export function MasterOutput({
     label,
     icon,
-    volume,
-    muted,
-    outputDevice,
+    bus,
     onVolumeChange,
     onMuteToggle,
-    onOutputDeviceChange,
 }: MasterOutputProps) {
-    const meterValue = muted ? 0 : volume * 0.9
+    // Frontend-only local state for output device (not yet wired to backend)
+    const [outputDevice, setOutputDevice] = useState('Default Output')
+
+    const displayVolume = toDisplay(bus.volume)
+    const meterValue = bus.muted ? 0 : displayVolume * 0.9
 
     return (
         <div className="flex h-full flex-col items-center gap-3 rounded-2xl border border-border bg-card p-3">
@@ -48,8 +56,8 @@ export function MasterOutput({
                 </span>
             </div>
 
-            {/* Output device selector */}
-            <Select value={outputDevice} onValueChange={onOutputDeviceChange}>
+            {/* Output device selector (frontend-only) */}
+            <Select value={outputDevice} onValueChange={setOutputDevice}>
                 <SelectTrigger
                     size="sm"
                     className="h-7 w-full gap-1 rounded-lg px-2 text-[10px]"
@@ -67,14 +75,14 @@ export function MasterOutput({
                 </SelectContent>
             </Select>
 
-            {/* Slider + single Meter */}
+            {/* Slider + Meter */}
             <div className="flex flex-1 items-center gap-2">
                 <Meter value={meterValue} />
                 <Slider
                     orientation="vertical"
                     min={0}
                     max={100}
-                    value={[volume]}
+                    value={[displayVolume]}
                     onValueChange={(v) => onVolumeChange(v[0])}
                     className="h-full"
                 />
@@ -82,21 +90,21 @@ export function MasterOutput({
 
             {/* Volume readout */}
             <span className="text-[9px] font-medium tabular-nums text-muted-foreground">
-                {muted ? '--' : volume}
+                {bus.muted ? '--' : displayVolume}
             </span>
 
             {/* Mute */}
             <Button
-                variant={muted ? 'default' : 'ghost'}
+                variant={bus.muted ? 'default' : 'ghost'}
                 size="icon-xs"
                 onClick={onMuteToggle}
                 className={cn(
                     'shrink-0',
-                    muted &&
+                    bus.muted &&
                         'bg-destructive/15 text-destructive hover:bg-destructive/25',
                 )}
             >
-                {muted ? (
+                {bus.muted ? (
                     <VolumeOffIcon className="size-3" />
                 ) : (
                     <Volume2Icon className="size-3" />

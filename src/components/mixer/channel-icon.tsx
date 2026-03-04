@@ -5,10 +5,10 @@ import {
     Mic2Icon,
     MonitorIcon,
     Music2Icon,
+    Volume2Icon,
 } from 'lucide-react'
-import type { ChannelId } from './types'
 
-const iconMap: Record<ChannelId, React.ElementType> = {
+const NAME_TO_ICON: Record<string, React.ElementType> = {
     mic: Mic2Icon,
     system: MonitorIcon,
     browser: GlobeIcon,
@@ -18,12 +18,12 @@ const iconMap: Record<ChannelId, React.ElementType> = {
 }
 
 export function ChannelIcon({
-    type,
+    name,
     className,
 }: {
-    type: ChannelId
+    name: string
     className?: string
 }) {
-    const Icon = iconMap[type]
+    const Icon = NAME_TO_ICON[name.toLowerCase()] ?? Volume2Icon
     return <Icon className={className} />
 }
