@@ -1,3 +1,5 @@
+pub mod audio;
+pub mod backend;
 pub mod commands;
 pub mod core;
 
