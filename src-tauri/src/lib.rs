@@ -6,13 +6,13 @@ pub mod core;
 use std::sync::Mutex;
 use tauri::{tray::TrayIconBuilder, Manager};
 
-use core::{AppState, Config};
+use core::{Config, AudioEngine};
 
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let mut state = AppState::default();
-
+            let mut engine = AudioEngine::new();
+/*
             // App State and Config Loading
             match Config::load() {
                 Ok(config) => state = AppState::from_config(config),
@@ -28,7 +28,7 @@ pub fn run() {
             }
 
             app.manage(Mutex::new(state));
-
+*/
             // Tray icon
             let quit = tauri::menu::MenuItem::with_id(
                 app,
@@ -55,16 +55,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            // Channels
-            commands::channel::add_channel,
-            commands::channel::get_channels,
-            commands::channel::delete_channel,
-            commands::channel::reorder_channels,
-            commands::channel::update_channel_send,
-            commands::channel::update_channel_connections,
-            // Buses
-            commands::bus::get_buses,
-            commands::bus::update_bus,
+
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

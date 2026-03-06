@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::audio::Sink;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8,15 +9,17 @@ pub struct Channel {
     pub name: String,
     pub sends: Vec<Send>,
     pub connections: Vec<Connection>,
+    pub virtual_sink: Sink,
 }
 
 impl Channel {
-    pub fn new(name: String, sends: Vec<Send>) -> Self {
+    pub fn new(name: String, sends: Vec<Send>, virtual_sink: Sink) -> Self {
         Self {
             id: Uuid::new_v4(),
             name,
             sends,
             connections: Vec::new(),
+            virtual_sink,
         }
     }
 }

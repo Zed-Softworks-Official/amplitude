@@ -1,39 +1,35 @@
-use crate::audio::{AudioBackend, Sinks};
-use std::collections::HashMap;
+use crate::audio::{AudioBackend, Sink};
+use crate::core::channels::{Channel, Send};
+
+use uuid::Uuid;
 
 pub struct PipewireBackend {
-    sinks: HashMap<Uuid, Sink>,
+    pub default_sends: Vec<Send>,
+}
+
+impl PipewireBackend {
+    pub fn new() -> Self {
+        let default_sends = vec![
+            Send::new(Uuid::new_v4(), 0.0, false),
+            Send::new(Uuid::new_v4(), 0.0, false),
+        ];
+
+        Self { default_sends }
+    }
 }
 
 impl AudioBackend for PipewireBackend {
-    fn new() -> Self {
-        Self {
-            sinks: HashMap::new(),
-        }
-    }
+    fn create_channel(&mut self, name: String) -> Result<Channel, String> {
+        // Create A New Virtual Sink using pipewire
 
-    fn get_sinks(&self) -> &HashMap<Uuid, Sink> {
-        &self.sinks
+        Ok(Channel::new(
+            name,
+            self.default_sends.clone(),
+            Sink::new("TODO".to_string()),
+        ))
     }
+}
 
-    fn get_sink(&self, id: Uuid) -> Option<&Sink> {
-        self.sinks.get(&id)
-    }
-
-    fn create_sink(&self) -> Result<Sink, String> {
-        // TODO: Implement
-        let sink = Sink::new("TODO");
-        self.sinks.insert(sink.id, sink);
-        Ok(sink)
-    }
-
-    fn delete_sink(&self, id: Uuid) -> Result<(), String> {
-        self.sinks.remove(&id);
-        Ok(())
-    }
-
-    fn update_sink(&self, id: Uuid, sink: Sink) -> Result<(), String> {
-        self.sinks.insert(id, sink);
-        Ok(())
-    }
+pub fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(PipewireBackend::new())
 }
