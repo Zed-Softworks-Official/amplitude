@@ -1,32 +1,22 @@
 use crate::audio::{AudioBackend, Sink};
-use crate::core::channels::{Channel, Send};
 
-use uuid::Uuid;
-
-pub struct PipewireBackend {
-    pub default_sends: Vec<Send>,
-}
+pub struct PipewireBackend {}
 
 impl PipewireBackend {
     pub fn new() -> Self {
-        let default_sends = vec![
-            Send::new(Uuid::new_v4(), 0.0, false),
-            Send::new(Uuid::new_v4(), 0.0, false),
-        ];
-
-        Self { default_sends }
+        Self {}
     }
 }
 
 impl AudioBackend for PipewireBackend {
-    fn create_channel(&mut self, name: String) -> Result<Channel, String> {
-        // Create A New Virtual Sink using pipewire
+    fn create_virtual_sink(&mut self, name: &str) -> Result<Sink, String> {
+        // TODO: Create a real PipeWire virtual sink node
+        Ok(Sink::new(format!("pipewire:{}", name)))
+    }
 
-        Ok(Channel::new(
-            name,
-            self.default_sends.clone(),
-            Sink::new("TODO".to_string()),
-        ))
+    fn destroy_virtual_sink(&mut self, _sink: &Sink) -> Result<(), String> {
+        // TODO: Destroy the PipeWire virtual sink node
+        Ok(())
     }
 }
 

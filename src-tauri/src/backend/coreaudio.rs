@@ -1,5 +1,4 @@
 use crate::audio::{AudioBackend, Sink};
-use crate::core::channels::{Channel, Send};
 
 pub struct CoreAudioBackend {}
 
@@ -10,16 +9,14 @@ impl CoreAudioBackend {
 }
 
 impl AudioBackend for CoreAudioBackend {
-    fn create_channel(
-        &mut self,
-        name: String,
-        default_sends: Vec<Send>,
-    ) -> Result<Channel, String> {
-        Ok(Channel::new(
-            name,
-            default_sends,
-            Sink::new("TODO".to_string()),
-        ))
+    fn create_virtual_sink(&mut self, name: &str) -> Result<Sink, String> {
+        // TODO: Create a real CoreAudio virtual sink
+        Ok(Sink::new(format!("coreaudio:{}", name)))
+    }
+
+    fn destroy_virtual_sink(&mut self, _sink: &Sink) -> Result<(), String> {
+        // TODO: Tear down the CoreAudio virtual sink
+        Ok(())
     }
 }
 

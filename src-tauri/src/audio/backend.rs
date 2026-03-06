@@ -1,9 +1,6 @@
-use crate::core::channels::{Channel, Send};
+use crate::audio::Sink;
 
-pub trait AudioBackend {
-    fn create_channel(
-        &mut self,
-        name: String,
-        default_sends: Vec<Send>,
-    ) -> Result<Channel, String>;
+pub trait AudioBackend: Send {
+    fn create_virtual_sink(&mut self, name: &str) -> Result<Sink, String>;
+    fn destroy_virtual_sink(&mut self, sink: &Sink) -> Result<(), String>;
 }

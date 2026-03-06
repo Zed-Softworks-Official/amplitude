@@ -1,9 +1,18 @@
 use crate::core::{bus::Bus, channels::Channel};
-use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, fs::File, io::Write};
 use uuid::Uuid;
 
+/// The data persisted to disk. Sinks are included via `Channel.virtual_sink`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavePayload {
+    pub channels: HashMap<Uuid, Channel>,
+    pub buses: HashMap<Uuid, Bus>,
+    pub channel_order: Vec<Uuid>,
+}
+
+/// Serializable config file structure — same shape as SavePayload,
+/// kept as a distinct type so the on-disk format can diverge later.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub channels: HashMap<Uuid, Channel>,
@@ -12,11 +21,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(state: AppState) -> Self {
+    pub fn from_payload(payload: SavePayload) -> Self {
         Self {
-            channels: state.channels.clone(),
-            buses: state.buses.clone(),
-            channel_order: state.channel_order.clone(),
+            channels: payload.channels,
+            buses: payload.buses,
+            channel_order: payload.channel_order,
         }
     }
 
