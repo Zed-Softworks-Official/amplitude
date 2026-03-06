@@ -9,6 +9,9 @@ use uuid::Uuid;
 #[cfg(target_os = "linux")]
 use crate::backend::pipewire::create_backend;
 
+#[cfg(target_os = "macos")]
+use crate::backend::coreaudio::create_backend;
+
 pub struct AudioEngine {
     backend: Box<dyn AudioBackend>,
     channels: HashMap<Uuid, Channel>,

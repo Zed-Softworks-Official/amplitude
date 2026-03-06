@@ -1,40 +1,28 @@
 use crate::audio::{AudioBackend, Sink};
-use std::collections::HashMap;
-use uuid::Uuid;
+use crate::core::channels::{Channel, Send};
 
-pub struct CoreAudioBackend {
-    sinks: HashMap<Uuid, Sink>,
+pub struct CoreAudioBackend {}
+
+impl CoreAudioBackend {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 impl AudioBackend for CoreAudioBackend {
-    fn new() -> Self {
-        Self {
-            sinks: HashMap::new(),
-        }
+    fn create_channel(
+        &mut self,
+        name: String,
+        default_sends: Vec<Send>,
+    ) -> Result<Channel, String> {
+        Ok(Channel::new(
+            name,
+            default_sends,
+            Sink::new("TODO".to_string()),
+        ))
     }
+}
 
-    fn get_sinks(&self) -> &HashMap<Uuid, Sink> {
-        &self.sinks
-    }
-
-    fn get_sink(&self, id: Uuid) -> Option<&Sink> {
-        self.sinks.get(&id)
-    }
-
-    fn create_sink(&mut self) -> Result<Sink, String> {
-        // TODO: Implement
-        let sink = Sink::new("TODO".to_string());
-        self.sinks.insert(sink.id, sink.clone());
-        Ok(sink)
-    }
-
-    fn delete_sink(&mut self, id: Uuid) -> Result<(), String> {
-        self.sinks.remove(&id);
-        Ok(())
-    }
-
-    fn update_sink(&mut self, id: Uuid, sink: Sink) -> Result<(), String> {
-        self.sinks.insert(id, sink);
-        Ok(())
-    }
+pub fn create_backend() -> Box<dyn AudioBackend> {
+    Box::new(CoreAudioBackend::new())
 }
