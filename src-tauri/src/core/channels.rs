@@ -9,6 +9,10 @@ pub struct Channel {
     pub name: String,
     pub sends: Vec<Send>,
     pub connections: Vec<Connection>,
+    /// Runtime-only: the live PipeWire sink node for this channel.
+    /// Skipped during serialisation — the node ID is ephemeral and is
+    /// recreated fresh on every startup.
+    #[serde(skip)]
     pub virtual_sink: Sink,
 }
 

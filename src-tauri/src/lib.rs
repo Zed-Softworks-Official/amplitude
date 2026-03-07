@@ -7,10 +7,10 @@ use std::sync::{Arc, Mutex};
 use tauri::{tray::TrayIconBuilder, Emitter, Manager};
 
 use commands::{
-    bus::{get_buses, update_bus},
+    bus::{get_buses, set_bus_output, update_bus},
     channel::{
         add_channel, delete_channel, get_channels, reorder_channels,
-        update_channel_connections, update_channel_send,
+        set_channel_input, update_channel_connections, update_channel_send,
     },
     nodes::get_nodes,
 };
@@ -104,8 +104,10 @@ pub fn run() {
             reorder_channels,
             update_channel_send,
             update_channel_connections,
+            set_channel_input,
             get_buses,
             update_bus,
+            set_bus_output,
             get_nodes,
         ])
         .run(tauri::generate_context!())

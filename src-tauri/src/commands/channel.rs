@@ -7,6 +7,22 @@ use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use uuid::Uuid;
 
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn set_channel_input(
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
+    channel_id: Uuid,
+    input_node_id: u64,
+) -> Result<(), String> {
+    let mut engine = state
+        .lock()
+        .map_err(|_| "engine lock poisoned".to_string())?;
+    engine.set_channel_input(channel_id, input_node_id)
+}
+
 fn emit_and_save(
     app: &tauri::AppHandle,
     payload: AppStatePayload,

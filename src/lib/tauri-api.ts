@@ -97,3 +97,31 @@ export function updateBus(
 export function getNodes(): Promise<NodeInfo[]> {
     return invoke('get_nodes')
 }
+
+// ---------------------------------------------------------------------------
+// Routing commands
+// ---------------------------------------------------------------------------
+
+/**
+ * Route a physical input node (mic, line-in, etc.) into a channel's virtual
+ * sink. Replaces any previously set input link for that channel.
+ * `inputNodeId` is the PipeWire global ID of the source node.
+ */
+export function setChannelInput(
+    channelId: string,
+    inputNodeId: number,
+): Promise<void> {
+    return invoke('set_channel_input', { channelId, inputNodeId })
+}
+
+/**
+ * Route the monitor output of a bus's virtual sink to a physical output
+ * device. Replaces any previously set output link for that bus.
+ * `outputNodeId` is the PipeWire global ID of the physical sink node.
+ */
+export function setBusOutput(
+    busId: string,
+    outputNodeId: number,
+): Promise<void> {
+    return invoke('set_bus_output', { busId, outputNodeId })
+}

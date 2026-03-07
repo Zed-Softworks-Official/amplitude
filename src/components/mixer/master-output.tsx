@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
-import { toDisplay } from '~/lib/tauri-api'
+import { setBusOutput, toDisplay } from '~/lib/tauri-api'
 import type { Bus, NodeInfo } from '~/lib/types'
 import { cn } from '~/lib/utils'
 import { Meter } from './meter'
@@ -55,7 +55,13 @@ export function MasterOutput({
             </div>
 
             {/* Output device selector */}
-            <Select value={outputDevice} onValueChange={setOutputDevice}>
+            <Select
+                value={outputDevice}
+                onValueChange={(nodeIdStr) => {
+                    setOutputDevice(nodeIdStr)
+                    setBusOutput(bus.id, Number(nodeIdStr)).catch(console.error)
+                }}
+            >
                 <SelectTrigger
                     size="sm"
                     className="h-7 w-full gap-1 rounded-lg px-2 text-[10px]"

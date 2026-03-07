@@ -33,7 +33,7 @@ import {
     SelectValue,
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
-import { toDisplay } from '~/lib/tauri-api'
+import { setChannelInput, toDisplay } from '~/lib/tauri-api'
 import type { Bus, Channel, NodeInfo } from '~/lib/types'
 import { cn } from '~/lib/utils'
 import { AppPicker } from './app-picker'
@@ -203,7 +203,15 @@ export function ChannelStrip({
 
             {/* Routing selector */}
             {isMic ? (
-                <Select value={inputDevice} onValueChange={setInputDevice}>
+                <Select
+                    value={inputDevice}
+                    onValueChange={(nodeIdStr) => {
+                        setInputDevice(nodeIdStr)
+                        setChannelInput(channel.id, Number(nodeIdStr)).catch(
+                            console.error,
+                        )
+                    }}
+                >
                     <SelectTrigger
                         size="sm"
                         className="h-7 w-full gap-1 rounded-lg px-2 text-[10px]"

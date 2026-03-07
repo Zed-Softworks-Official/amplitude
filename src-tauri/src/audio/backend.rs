@@ -13,6 +13,18 @@ pub trait AudioBackend: Send {
     /// Destroy a previously created virtual sink.
     fn destroy_virtual_sink(&mut self, sink: &Sink) -> Result<(), String>;
 
+    /// Create a PipeWire link from the monitor/output ports of `output_node_id`
+    /// to the input ports of `input_node_id`.
+    /// Returns the PipeWire global link ID on success.
+    fn create_link(
+        &mut self,
+        output_node_id: u64,
+        input_node_id: u64,
+    ) -> Result<u64, String>;
+
+    /// Destroy a previously created link by its PipeWire global ID.
+    fn destroy_link(&mut self, link_id: u64) -> Result<(), String>;
+
     /// Drain any backend events that have accumulated since the last call.
     /// Non-blocking — returns an empty vec if nothing is pending.
     fn poll_events(&mut self) -> Vec<BackendEvent>;
@@ -31,19 +43,37 @@ pub enum BackendEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Commands sent from the engine to the PipeWire thread (internal use only;
-// not part of the public trait — kept here for discoverability).
+// Reply channel types used in commands that need a synchronous response
 // ---------------------------------------------------------------------------
 
-/// Reply channel type used inside CreateVirtualSink.
-/// The PW thread sends back the assigned global node ID on success.
+/// Reply channel for `CreateVirtualSink` — carries the PW node global ID.
 pub type SinkReply = std::sync::mpsc::SyncSender<Result<u64, String>>;
+
+/// Reply channel for `CreateLink` — carries the PW link global ID.
+pub type LinkReply = std::sync::mpsc::SyncSender<Result<u64, String>>;
+
+// ---------------------------------------------------------------------------
+// Commands sent from the engine to the PipeWire thread (internal to the
+// PipeWire backend; not part of the public trait).
+// ---------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub enum BackendCommand {
-    /// Ask the PW thread to create a null-sink with the given node name.
-    /// The reply channel receives the PipeWire global node ID on success.
+    /// Create a null-sink node. The reply channel receives the PW global node
+    /// ID once the registry confirms the node is live.
     CreateVirtualSink { name: String, reply: SinkReply },
-    /// Ask the PW thread to destroy the sink identified by its PW node ID.
+
+    /// Destroy the sink identified by its PW global node ID.
     DestroyVirtualSink { external_id: u64 },
+
+    /// Create a link from the monitor/output ports of `output_node_id` to the
+    /// input ports of `input_node_id`. Reply carries the PW link global ID.
+    CreateLink {
+        output_node_id: u64,
+        input_node_id: u64,
+        reply: LinkReply,
+    },
+
+    /// Destroy the link with the given PW global ID.
+    DestroyLink { link_id: u64 },
 }
