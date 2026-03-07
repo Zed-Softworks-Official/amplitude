@@ -1,10 +1,34 @@
-use crate::audio::{AudioBackend, Sink};
+use crate::audio::{AudioBackend, BackendCommand, BackendEvent, Sink};
+use std::sync::mpsc;
 
-pub struct PipewireBackend {}
+use pipewire::{context::ContextBox, main_loop::MainLoopBox};
+
+pub struct PipewireBackend {
+    command_tx: mpsc::Sender<BackendCommand>,
+    event_rx: pipewire::channel::Receiver<BackendEvent>,
+    thread_handle: Option<std::thread::JoinHandle<()>>,
+}
 
 impl PipewireBackend {
     pub fn new() -> Self {
-        Self {}
+        let (command_tx, command_rx) = mpsc::channel();
+        let (event_tx, event_rx) = pipewire::channel::channel();
+
+        let thread_handle = std::thread::Builder::new()
+            .name("Amplitude Pipewire Backend".to_string())
+            .spawn(move || {
+                if let Err(e) = pw_thread(command_rx, event_tx) {
+                    println!("Pipewire thread failed: {}", e);
+                };
+            })
+            .map_err(|e| format!("Failed to spawn Pipewire thread: {}", e))
+            .unwrap();
+
+        Self {
+            command_tx,
+            event_rx,
+            thread_handle: Some(thread_handle),
+        }
     }
 }
 
@@ -22,4 +46,28 @@ impl AudioBackend for PipewireBackend {
 
 pub fn create_backend() -> Box<dyn AudioBackend> {
     Box::new(PipewireBackend::new())
+}
+
+fn pw_thread(
+    command_rx: mpsc::Receiver<BackendCommand>,
+    event_tx: pipewire::channel::Sender<BackendEvent>,
+) -> Result<(), String> {
+    pipewire::init();
+
+    let mainloop = MainLoopBox::new(None).expect("Failed to create mainloop");
+    let context = ContextBox::new(mainloop.loop_(), None)
+        .expect("Failed to create context");
+    let core = context.connect(None).expect("Failed to connect to context");
+    let registry = core.get_registry().expect("Failed to get registry");
+
+    let _listener = registry
+        .add_listener_local()
+        .global(|global| {
+            println!("Global event: {:?}", global);
+        })
+        .register();
+
+    mainloop.run();
+
+    Ok(())
 }
