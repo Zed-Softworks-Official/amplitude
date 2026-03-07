@@ -3,10 +3,9 @@ use std::sync::mpsc;
 
 use pipewire::{context::ContextBox, main_loop::MainLoopBox};
 
-pub struct PipewireBackend {
+struct PipewireBackend {
     command_tx: mpsc::Sender<BackendCommand>,
     event_rx: pipewire::channel::Receiver<BackendEvent>,
-    thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl PipewireBackend {
@@ -14,7 +13,7 @@ impl PipewireBackend {
         let (command_tx, command_rx) = mpsc::channel();
         let (event_tx, event_rx) = pipewire::channel::channel();
 
-        let thread_handle = std::thread::Builder::new()
+        let _thread_handle = std::thread::Builder::new()
             .name("Amplitude Pipewire Backend".to_string())
             .spawn(move || {
                 if let Err(e) = pw_thread(command_rx, event_tx) {
@@ -27,7 +26,6 @@ impl PipewireBackend {
         Self {
             command_tx,
             event_rx,
-            thread_handle: Some(thread_handle),
         }
     }
 }
