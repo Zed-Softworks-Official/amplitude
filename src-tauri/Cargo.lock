@@ -38,6 +38,7 @@ version = "0.1.0"
 dependencies = [
  "coreaudio-rs",
  "dirs",
+ "once_cell",
  "pipewire",
  "serde",
  "serde_json",

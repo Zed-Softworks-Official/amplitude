@@ -3,7 +3,7 @@ use crate::core::{
     config::Config,
     engine::{AppStatePayload, AudioEngine},
 };
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use uuid::Uuid;
 
@@ -22,7 +22,7 @@ fn emit_and_save(
 
 #[tauri::command]
 pub fn get_buses(
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
 ) -> Result<Vec<Bus>, String> {
     let engine = state
         .lock()
@@ -33,7 +33,7 @@ pub fn get_buses(
 #[tauri::command]
 pub fn update_bus(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     bus_id: Uuid,
     volume: Option<f32>,
     muted: Option<bool>,

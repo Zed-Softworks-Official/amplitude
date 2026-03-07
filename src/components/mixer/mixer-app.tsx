@@ -17,16 +17,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { Separator } from '~/components/ui/separator'
 import { useSubscription } from '~/hooks/use-subscription'
 import {
+    type AppStatePayload,
     deleteChannel,
     getBuses,
     getChannels,
+    getNodes,
     reorderChannels,
-    type AppStatePayload,
     updateBus,
     updateChannelConnections,
     updateChannelSend,
 } from '~/lib/tauri-api'
-import type { Bus, Channel } from '~/lib/types'
+import type { Bus, Channel, NodeInfo } from '~/lib/types'
 import { AddChannelModal } from './add-channel-modal'
 import { ChannelStrip } from './channel-strip'
 import { MasterOutput } from './master-output'
@@ -34,6 +35,7 @@ import { MasterOutput } from './master-output'
 export function MixerApp() {
     const [channels, setChannels] = useState<Channel[]>([])
     const [buses, setBuses] = useState<Bus[]>([])
+    const [nodes, setNodes] = useState<NodeInfo[]>([])
     const [addModalOpen, setAddModalOpen] = useState(false)
 
     // ---------------------------------------------------------------------------
@@ -43,6 +45,7 @@ export function MixerApp() {
     useEffect(() => {
         getChannels().then(setChannels).catch(console.error)
         getBuses().then(setBuses).catch(console.error)
+        getNodes().then(setNodes).catch(console.error)
     }, [])
 
     // ---------------------------------------------------------------------------
@@ -55,6 +58,12 @@ export function MixerApp() {
     }, [])
 
     useSubscription<AppStatePayload>('appstate-changed', handleAppStateChanged)
+
+    const handleNodesChanged = useCallback((updated: NodeInfo[]) => {
+        setNodes(updated)
+    }, [])
+
+    useSubscription<NodeInfo[]>('nodes-changed', handleNodesChanged)
 
     // ---------------------------------------------------------------------------
     // DnD
@@ -99,13 +108,20 @@ export function MixerApp() {
         )
     }
 
-    const handleMuteToggle = (channelId: string, busId: string, currentMuted: boolean) => {
+    const handleMuteToggle = (
+        channelId: string,
+        busId: string,
+        currentMuted: boolean,
+    ) => {
         updateChannelSend(channelId, busId, { muted: !currentMuted }).catch(
             console.error,
         )
     }
 
-    const handleConnectionsChange = (channelId: string, processNames: string[]) => {
+    const handleConnectionsChange = (
+        channelId: string,
+        processNames: string[],
+    ) => {
         updateChannelConnections(channelId, processNames).catch(console.error)
     }
 
@@ -151,14 +167,22 @@ export function MixerApp() {
                                 <ChannelStrip
                                     channel={channel}
                                     buses={buses}
+                                    nodes={nodes}
                                     onVolumeChange={(busId, v) =>
                                         handleVolumeChange(channel.id, busId, v)
                                     }
                                     onMuteToggle={(busId, muted) =>
-                                        handleMuteToggle(channel.id, busId, muted)
+                                        handleMuteToggle(
+                                            channel.id,
+                                            busId,
+                                            muted,
+                                        )
                                     }
                                     onConnectionsChange={(names) =>
-                                        handleConnectionsChange(channel.id, names)
+                                        handleConnectionsChange(
+                                            channel.id,
+                                            names,
+                                        )
                                     }
                                     onDelete={() =>
                                         handleDeleteChannel(channel.id)
@@ -191,6 +215,7 @@ export function MixerApp() {
                         label="Monitor"
                         icon={<SpeakerIcon className="size-3.5" />}
                         bus={monitorBus}
+                        nodes={nodes}
                         onVolumeChange={(v) =>
                             handleBusVolumeChange(monitorBus.id, v)
                         }
@@ -204,6 +229,7 @@ export function MixerApp() {
                         label="Stream"
                         icon={<RadioIcon className="size-3.5" />}
                         bus={streamBus}
+                        nodes={nodes}
                         onVolumeChange={(v) =>
                             handleBusVolumeChange(streamBus.id, v)
                         }

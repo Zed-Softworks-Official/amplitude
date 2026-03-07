@@ -5,29 +5,29 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '~/components/ui/popover'
+import type { NodeInfo } from '~/lib/types'
 import { cn } from '~/lib/utils'
 
-// Placeholder application list until backend provides a real process list
-const APPLICATIONS = [
-    'Chrome',
-    'Spotify',
-    'Discord',
-    'Game.exe',
-    'OBS Studio',
-    'Firefox',
-]
-
 interface AppPickerProps {
+    /** All current PipeWire nodes — component filters to audio-producing streams. */
+    nodes: NodeInfo[]
+    /** Currently selected app names (process names from the backend). */
     selected: string[]
     onChange: (apps: string[]) => void
 }
 
-export function AppPicker({ selected, onChange }: AppPickerProps) {
-    const toggleApp = (app: string) => {
-        if (selected.includes(app)) {
-            onChange(selected.filter((a) => a !== app))
+export function AppPicker({ nodes, selected, onChange }: AppPickerProps) {
+    // Only show application audio streams, excluding our own virtual sinks.
+    const appNodes = nodes.filter(
+        (n) =>
+            !n.isAmplitudeVirtual && n.mediaClass?.type === 'streamOutputAudio',
+    )
+
+    const toggleApp = (name: string) => {
+        if (selected.includes(name)) {
+            onChange(selected.filter((a) => a !== name))
         } else {
-            onChange([...selected, app])
+            onChange([...selected, name])
         }
     }
 
@@ -55,24 +55,32 @@ export function AppPicker({ selected, onChange }: AppPickerProps) {
                 </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-48 gap-0 p-1">
-                {APPLICATIONS.map((app) => {
-                    const isChecked = selected.includes(app)
-                    return (
-                        <button
-                            key={app}
-                            type="button"
-                            onClick={() => toggleApp(app)}
-                            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors hover:bg-accent"
-                        >
-                            <Checkbox
-                                checked={isChecked}
-                                tabIndex={-1}
-                                className="pointer-events-none"
-                            />
-                            <span>{app}</span>
-                        </button>
-                    )
-                })}
+                {appNodes.length === 0 ? (
+                    <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
+                        No apps playing audio
+                    </p>
+                ) : (
+                    appNodes.map((node) => {
+                        const displayName =
+                            node.appName ?? node.description ?? node.name
+                        const isChecked = selected.includes(displayName)
+                        return (
+                            <button
+                                key={node.id}
+                                type="button"
+                                onClick={() => toggleApp(displayName)}
+                                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors hover:bg-accent"
+                            >
+                                <Checkbox
+                                    checked={isChecked}
+                                    tabIndex={-1}
+                                    className="pointer-events-none"
+                                />
+                                <span>{displayName}</span>
+                            </button>
+                        )
+                    })
+                )}
             </PopoverContent>
         </Popover>
     )

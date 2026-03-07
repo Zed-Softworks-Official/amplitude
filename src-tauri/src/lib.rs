@@ -3,8 +3,8 @@ pub mod backend;
 pub mod commands;
 pub mod core;
 
-use std::sync::Mutex;
-use tauri::{tray::TrayIconBuilder, Manager};
+use std::sync::{Arc, Mutex};
+use tauri::{tray::TrayIconBuilder, Emitter, Manager};
 
 use commands::{
     bus::{get_buses, update_bus},
@@ -12,6 +12,7 @@ use commands::{
         add_channel, delete_channel, get_channels, reorder_channels,
         update_channel_connections, update_channel_send,
     },
+    nodes::get_nodes,
 };
 use core::{config::Config, engine::AudioEngine};
 
@@ -38,7 +39,40 @@ pub fn run() {
                 }
             };
 
-            app.manage(Mutex::new(engine));
+            // Wrap in Arc<Mutex> so the poller task can share ownership with
+            // Tauri's managed state.
+            let engine = Arc::new(Mutex::new(engine));
+
+            app.manage(Arc::clone(&engine));
+
+            // -----------------------------------------------------------------
+            // Background node poller — drains BackendEvents every 100 ms and
+            // emits "nodes-changed" when the node list changes.
+            // Runs on a dedicated OS thread to avoid a tokio dependency.
+            // -----------------------------------------------------------------
+
+            let app_handle = app.handle().clone();
+            let engine_poller = Arc::clone(&engine);
+
+            std::thread::Builder::new()
+                .name("Amplitude Node Poller".to_string())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+
+                    let events = match engine_poller.lock() {
+                        Ok(mut eng) => eng.poll_events(),
+                        Err(_) => break,
+                    };
+
+                    if !events.is_empty() {
+                        let nodes = match engine_poller.lock() {
+                            Ok(eng) => eng.get_nodes(),
+                            Err(_) => break,
+                        };
+                        let _ = app_handle.emit("nodes-changed", nodes);
+                    }
+                })
+                .expect("failed to spawn node poller thread");
 
             let quit = tauri::menu::MenuItem::with_id(
                 app,
@@ -53,11 +87,10 @@ pub fn run() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "quit" => {
+                .on_menu_event(|app, event| {
+                    if event.id().as_ref() == "quit" {
                         app.exit(0);
                     }
-                    _ => {}
                 })
                 .build(app)?;
 
@@ -73,6 +106,7 @@ pub fn run() {
             update_channel_connections,
             get_buses,
             update_bus,
+            get_nodes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

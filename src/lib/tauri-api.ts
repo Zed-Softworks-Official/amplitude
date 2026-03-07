@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Bus, Channel } from './types'
+import type { Bus, Channel, NodeInfo } from './types'
 
 // ---------------------------------------------------------------------------
 // Volume conversion helpers
@@ -88,4 +88,12 @@ export function updateBus(
         volume: opts.volume !== undefined ? fromDisplay(opts.volume) : null,
         muted: opts.muted !== undefined ? opts.muted : null,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Node commands
+// ---------------------------------------------------------------------------
+
+export function getNodes(): Promise<NodeInfo[]> {
+    return invoke('get_nodes')
 }

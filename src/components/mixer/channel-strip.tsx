@@ -33,24 +33,17 @@ import {
     SelectValue,
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
-import { cn } from '~/lib/utils'
 import { toDisplay } from '~/lib/tauri-api'
-import type { Bus, Channel } from '~/lib/types'
+import type { Bus, Channel, NodeInfo } from '~/lib/types'
+import { cn } from '~/lib/utils'
 import { AppPicker } from './app-picker'
 import { ChannelIcon } from './channel-icon'
 import { Meter } from './meter'
 
-// Placeholder input devices until backend provides them
-const INPUT_DEVICES = [
-    'Default Input',
-    'USB Microphone',
-    'Line In',
-    'Webcam Mic',
-]
-
 interface ChannelStripProps {
     channel: Channel
     buses: Bus[]
+    nodes: NodeInfo[]
     onVolumeChange: (busId: string, displayVolume: number) => void
     onMuteToggle: (busId: string, currentMuted: boolean) => void
     onConnectionsChange: (processNames: string[]) => void
@@ -77,7 +70,12 @@ function BusColumn({
     const meterValue = muted ? 0 : volume * 0.85
 
     return (
-        <div className={cn('flex flex-1 flex-col items-center gap-2', disabled && 'opacity-40')}>
+        <div
+            className={cn(
+                'flex flex-1 flex-col items-center gap-2',
+                disabled && 'opacity-40',
+            )}
+        >
             <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {label}
             </span>
@@ -123,6 +121,7 @@ function BusColumn({
 export function ChannelStrip({
     channel,
     buses,
+    nodes,
     onVolumeChange,
     onMuteToggle,
     onConnectionsChange,
@@ -130,8 +129,15 @@ export function ChannelStrip({
 }: ChannelStripProps) {
     const isMic = channel.name.toLowerCase() === 'mic'
 
-    // Frontend-only local state for input device (not yet wired to backend)
-    const [inputDevice, setInputDevice] = useState('Default Input')
+    // Input sources: physical inputs and virtual sources (excl. our own sinks)
+    const inputNodes = nodes.filter(
+        (n) =>
+            !n.isAmplitudeVirtual &&
+            (n.mediaClass?.type === 'audioSource' ||
+                n.mediaClass?.type === 'streamInputAudio'),
+    )
+
+    const [inputDevice, setInputDevice] = useState<string>('')
     const [deleteOpen, setDeleteOpen] = useState(false)
 
     const selectedConnections = channel.connections.map((c) => c.processName)
@@ -206,16 +212,26 @@ export function ChannelStrip({
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
-                            {INPUT_DEVICES.map((device) => (
-                                <SelectItem key={device} value={device}>
-                                    {device}
+                            {inputNodes.length === 0 ? (
+                                <SelectItem value="" disabled>
+                                    No inputs found
                                 </SelectItem>
-                            ))}
+                            ) : (
+                                inputNodes.map((node) => (
+                                    <SelectItem
+                                        key={node.id}
+                                        value={String(node.id)}
+                                    >
+                                        {node.description ?? node.name}
+                                    </SelectItem>
+                                ))
+                            )}
                         </SelectGroup>
                     </SelectContent>
                 </Select>
             ) : (
                 <AppPicker
+                    nodes={nodes}
                     selected={selectedConnections}
                     onChange={onConnectionsChange}
                 />
@@ -238,8 +254,16 @@ export function ChannelStrip({
                                 volume={displayVolume}
                                 muted={muted}
                                 disabled={!send}
-                                onVolumeChange={send ? (v) => onVolumeChange(bus.id, v) : () => {}}
-                                onMuteToggle={send ? () => onMuteToggle(bus.id, muted) : () => {}}
+                                onVolumeChange={
+                                    send
+                                        ? (v) => onVolumeChange(bus.id, v)
+                                        : () => {}
+                                }
+                                onMuteToggle={
+                                    send
+                                        ? () => onMuteToggle(bus.id, muted)
+                                        : () => {}
+                                }
                             />
                         </div>
                     )

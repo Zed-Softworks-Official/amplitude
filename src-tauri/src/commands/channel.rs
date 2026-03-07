@@ -3,7 +3,7 @@ use crate::core::{
     config::Config,
     engine::{AppStatePayload, AudioEngine},
 };
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use uuid::Uuid;
 
@@ -23,7 +23,7 @@ fn emit_and_save(
 #[tauri::command]
 pub fn add_channel(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     name: String,
 ) -> Result<Channel, String> {
     let mut engine = state
@@ -37,7 +37,7 @@ pub fn add_channel(
 
 #[tauri::command]
 pub fn get_channels(
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
 ) -> Result<Vec<Channel>, String> {
     let engine = state
         .lock()
@@ -48,7 +48,7 @@ pub fn get_channels(
 #[tauri::command]
 pub fn delete_channel(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     id: Uuid,
 ) -> Result<(), String> {
     let mut engine = state
@@ -62,7 +62,7 @@ pub fn delete_channel(
 #[tauri::command]
 pub fn reorder_channels(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     order: Vec<Uuid>,
 ) -> Result<(), String> {
     let mut engine = state
@@ -76,7 +76,7 @@ pub fn reorder_channels(
 #[tauri::command]
 pub fn update_channel_send(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     channel_id: Uuid,
     bus_id: Uuid,
     volume: Option<f32>,
@@ -93,7 +93,7 @@ pub fn update_channel_send(
 #[tauri::command]
 pub fn update_channel_connections(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Mutex<AudioEngine>>,
+    state: tauri::State<'_, Arc<Mutex<AudioEngine>>>,
     channel_id: Uuid,
     process_names: Vec<String>,
 ) -> Result<(), String> {

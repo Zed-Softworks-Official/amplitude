@@ -1,4 +1,5 @@
-use crate::audio::AudioBackend;
+use crate::audio::node::NodeInfo;
+use crate::audio::{AudioBackend, BackendEvent};
 use crate::core::{
     bus::Bus,
     channels::{Channel, Connection, Send},
@@ -28,6 +29,8 @@ pub struct AudioEngine {
     pub buses: HashMap<Uuid, Bus>,
     pub default_sends: Vec<Send>,
     pub channel_order: Vec<Uuid>,
+    /// Live cache of PipeWire nodes keyed by their global ID.
+    pub nodes: HashMap<u32, NodeInfo>,
 }
 
 impl AudioEngine {
@@ -53,9 +56,9 @@ impl AudioEngine {
             buses,
             default_sends,
             channel_order: Vec::new(),
+            nodes: HashMap::new(),
         };
 
-        // Mic channel is always required.
         engine.ensure_mic_channel();
 
         engine
@@ -88,8 +91,7 @@ impl AudioEngine {
             }
         }
 
-        // Any channels in the map not covered by channel_order
-        for (_id, channel) in &config.channels {
+        for channel in config.channels.values() {
             if !channel_order.contains(&channel.id) {
                 channel_order.push(channel.id);
                 channels.insert(channel.id, channel.clone());
@@ -102,6 +104,7 @@ impl AudioEngine {
             buses,
             default_sends,
             channel_order,
+            nodes: HashMap::new(),
         };
 
         engine.ensure_mic_channel();
@@ -109,7 +112,7 @@ impl AudioEngine {
         engine
     }
 
-    /// Guarantee a mic channel always exists. If one is absent, create it via the backend.
+    /// Guarantee a mic channel always exists.
     fn ensure_mic_channel(&mut self) {
         let has_mic = self
             .channels
@@ -117,10 +120,10 @@ impl AudioEngine {
             .any(|ch| ch.name.to_lowercase() == "mic");
 
         if !has_mic {
-            let sink =
-                self.backend.create_virtual_sink("mic").unwrap_or_else(|_| {
-                    crate::audio::Sink::new("mic:stub".to_string())
-                });
+            let sink = self
+                .backend
+                .create_virtual_sink("mic")
+                .unwrap_or_else(|_| crate::audio::Sink::new(0));
 
             let mic = Channel::new(
                 "mic".to_string(),
@@ -259,6 +262,30 @@ impl AudioEngine {
         Ok(())
     }
 
+    /// Drain pending backend events, update the node cache, and return any
+    /// events that occurred. The caller decides whether to emit a Tauri event.
+    pub fn poll_events(&mut self) -> Vec<BackendEvent> {
+        let events = self.backend.poll_events();
+        for event in &events {
+            match event {
+                BackendEvent::NodeAdded(info) => {
+                    self.nodes.insert(info.id, info.clone());
+                }
+                BackendEvent::NodeRemoved(id) => {
+                    self.nodes.remove(id);
+                }
+            }
+        }
+        events
+    }
+
+    /// Returns all currently known nodes sorted by ID for deterministic output.
+    pub fn get_nodes(&self) -> Vec<NodeInfo> {
+        let mut nodes: Vec<NodeInfo> = self.nodes.values().cloned().collect();
+        nodes.sort_by_key(|n| n.id);
+        nodes
+    }
+
     /// Returns channels in their persisted order.
     pub fn ordered_channels(&self) -> Vec<Channel> {
         let mut seen = std::collections::HashSet::new();
@@ -282,12 +309,18 @@ impl AudioEngine {
         }
     }
 
-    /// Minimal payload for persistence. Sinks are included via Channel.
+    /// Minimal payload for persistence.
     pub fn to_save_payload(&self) -> SavePayload {
         SavePayload {
             channels: self.channels.clone(),
             buses: self.buses.clone(),
             channel_order: self.channel_order.clone(),
         }
+    }
+}
+
+impl Default for AudioEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

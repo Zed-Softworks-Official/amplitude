@@ -10,23 +10,16 @@ import {
     SelectValue,
 } from '~/components/ui/select'
 import { Slider } from '~/components/ui/slider'
-import { cn } from '~/lib/utils'
 import { toDisplay } from '~/lib/tauri-api'
-import type { Bus } from '~/lib/types'
+import type { Bus, NodeInfo } from '~/lib/types'
+import { cn } from '~/lib/utils'
 import { Meter } from './meter'
-
-// Placeholder output devices until backend provides them
-const OUTPUT_DEVICES = [
-    'Default Output',
-    'Headphones',
-    'Speakers',
-    'HDMI Audio',
-]
 
 interface MasterOutputProps {
     label: string
     icon: React.ReactNode
     bus: Bus
+    nodes: NodeInfo[]
     onVolumeChange: (displayVolume: number) => void
     onMuteToggle: () => void
 }
@@ -35,11 +28,16 @@ export function MasterOutput({
     label,
     icon,
     bus,
+    nodes,
     onVolumeChange,
     onMuteToggle,
 }: MasterOutputProps) {
-    // Frontend-only local state for output device (not yet wired to backend)
-    const [outputDevice, setOutputDevice] = useState('Default Output')
+    const [outputDevice, setOutputDevice] = useState<string>('')
+
+    // Physical audio outputs only — exclude our own virtual sinks.
+    const outputNodes = nodes.filter(
+        (n) => !n.isAmplitudeVirtual && n.mediaClass?.type === 'audioSink',
+    )
 
     const displayVolume = toDisplay(bus.volume)
     const meterValue = bus.muted ? 0 : displayVolume * 0.9
@@ -56,7 +54,7 @@ export function MasterOutput({
                 </span>
             </div>
 
-            {/* Output device selector (frontend-only) */}
+            {/* Output device selector */}
             <Select value={outputDevice} onValueChange={setOutputDevice}>
                 <SelectTrigger
                     size="sm"
@@ -66,11 +64,20 @@ export function MasterOutput({
                 </SelectTrigger>
                 <SelectContent>
                     <SelectGroup>
-                        {OUTPUT_DEVICES.map((device) => (
-                            <SelectItem key={device} value={device}>
-                                {device}
+                        {outputNodes.length === 0 ? (
+                            <SelectItem value="" disabled>
+                                No outputs found
                             </SelectItem>
-                        ))}
+                        ) : (
+                            outputNodes.map((node) => (
+                                <SelectItem
+                                    key={node.id}
+                                    value={String(node.id)}
+                                >
+                                    {node.description ?? node.name}
+                                </SelectItem>
+                            ))
+                        )}
                     </SelectGroup>
                 </SelectContent>
             </Select>
