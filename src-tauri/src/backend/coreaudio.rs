@@ -18,6 +18,13 @@ impl Default for CoreAudioBackend {
 }
 
 impl AudioBackend for CoreAudioBackend {
+    fn create_bus_sink(&mut self, _name: &str) -> Result<Sink, String> {
+        // TODO: CoreAudio bus routing (aggregate device or AU graph output node)
+        let id = self.next_id;
+        self.next_id += 1;
+        Ok(Sink::new(id))
+    }
+
     fn create_virtual_sink(&mut self, _name: &str) -> Result<Sink, String> {
         // TODO: Create a real CoreAudio virtual sink (e.g. via AudioHardware)
         let id = self.next_id;

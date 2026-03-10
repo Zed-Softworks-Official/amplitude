@@ -6,6 +6,14 @@ use crate::audio::Sink;
 /// implementation is free to use internal threads and channels to communicate
 /// with the underlying audio subsystem.
 pub trait AudioBackend: Send {
+    /// Create a virtual sink node that acts as a mix bus.
+    ///
+    /// Semantically distinct from a channel sink — on future platforms
+    /// (CoreAudio, WASAPI) these may map to different constructs such as
+    /// aggregate devices or AU graph output nodes. Blocks until the platform
+    /// confirms the node exists and returns a handle.
+    fn create_bus_sink(&mut self, name: &str) -> Result<Sink, String>;
+
     /// Create a virtual sink (null-sink) with the given human-readable name.
     /// Blocks until the platform confirms the node exists and returns a handle.
     fn create_virtual_sink(&mut self, name: &str) -> Result<Sink, String>;

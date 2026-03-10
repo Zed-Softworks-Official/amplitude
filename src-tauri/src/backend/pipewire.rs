@@ -17,11 +17,14 @@ use crate::audio::{AudioBackend, BackendCommand, BackendEvent, Sink};
 /// Prefix applied to the internal `node.name` of every Amplitude-owned node.
 const AMPLITUDE_PREFIX: &str = "amplitude-";
 
-/// The two always-present bus sink nodes: (internal name suffix, display description).
-const BUS_NODES: [(&str, &str); 2] = [
-    ("monitor", "Amplitude Monitor"),
-    ("stream", "Amplitude Stream"),
-];
+// ---------------------------------------------------------------------------
+// Type aliases
+// ---------------------------------------------------------------------------
+
+/// Pending link state: the expected (output_node_id, input_node_id) pair and
+/// the one-shot reply channel that unblocks the engine once the registry
+/// confirms the link's global ID.
+type PendingLink = Rc<RefCell<Option<(u64, u64, crate::audio::LinkReply)>>>;
 
 /// How long synchronous reply channels wait before returning a timeout error.
 const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -67,6 +70,13 @@ impl Default for PipewireBackend {
 }
 
 impl AudioBackend for PipewireBackend {
+    fn create_bus_sink(&mut self, name: &str) -> Result<Sink, String> {
+        // At the PipeWire level a bus sink and a channel sink are both
+        // null-audio-sink adapter nodes — the distinction is semantic and
+        // lives in the engine. Delegate to the same command path.
+        self.create_virtual_sink(name)
+    }
+
     fn create_virtual_sink(&mut self, name: &str) -> Result<Sink, String> {
         let (reply_tx, reply_rx) = mpsc::sync_channel(1);
 
@@ -159,21 +169,11 @@ fn pw_thread(
     // Shared state (Rc<RefCell<_>> — PW thread is single-threaded)
     // -------------------------------------------------------------------------
 
-    // Channel sink proxies: external_id → Node proxy.
+    // Channel and bus sink proxies: external_id → Node proxy.
     // Kept alive so PipeWire doesn't destroy the underlying nodes.
     // Command handler inserts under u64::MAX (sentinel); registry callback
     // promotes to the real global ID.
     let our_sinks: Rc<RefCell<HashMap<u64, pw::node::Node>>> =
-        Rc::new(RefCell::new(HashMap::new()));
-
-    // Bus sink proxies: node_name_suffix ("monitor"/"stream") → Node proxy.
-    // Created immediately at thread startup and kept alive for the process lifetime.
-    let our_bus_sinks: Rc<RefCell<HashMap<String, pw::node::Node>>> =
-        Rc::new(RefCell::new(HashMap::new()));
-
-    // Resolved bus sink global IDs: name suffix → PW global ID.
-    // Populated by the registry callback when each bus sink node appears.
-    let bus_sink_ids: Rc<RefCell<HashMap<String, u64>>> =
         Rc::new(RefCell::new(HashMap::new()));
 
     // Link proxies: link global ID → Link proxy.
@@ -186,14 +186,10 @@ fn pw_thread(
         RefCell<Option<(String, crate::audio::SinkReply)>>,
     > = Rc::new(RefCell::new(None));
 
-    // Pending bus sink creations still waiting for their global IDs.
-    // Maps node_name_suffix → resolved flag (once seen in registry).
-    let pending_bus_sinks: Rc<RefCell<HashMap<String, bool>>> =
-        Rc::new(RefCell::new(HashMap::new()));
-
-    // Pending link creation: resolved by the registry when the Link object appears.
-    let pending_link: Rc<RefCell<Option<crate::audio::LinkReply>>> =
-        Rc::new(RefCell::new(None));
+    // Pending link creation: (output_node_id, input_node_id, reply).
+    // Storing the expected node IDs prevents stale or foreign Link registry
+    // events from consuming the reply before the real new link is confirmed.
+    let pending_link: PendingLink = Rc::new(RefCell::new(None));
 
     // -------------------------------------------------------------------------
     // Registry listener
@@ -201,79 +197,30 @@ fn pw_thread(
 
     let event_tx_reg = event_tx.clone();
     let pending_sink_reg = pending_sink.clone();
-    let pending_bus_sinks_reg = pending_bus_sinks.clone();
     let pending_link_reg = pending_link.clone();
     let our_sinks_reg = our_sinks.clone();
     let our_links_reg = our_links.clone();
-    let bus_sink_ids_reg = bus_sink_ids.clone();
 
     let _registry_listener = registry
         .add_listener_local()
-        .global(move |global| {
-            match global.type_ {
-                pw::types::ObjectType::Node => {
-                    handle_node_global(
-                        global,
-                        &event_tx_reg,
-                        &pending_sink_reg,
-                        &pending_bus_sinks_reg,
-                        &our_sinks_reg,
-                        &bus_sink_ids_reg,
-                    );
-                }
-                pw::types::ObjectType::Link => {
-                    // Resolve a pending CreateLink reply.
-                    if let Some(reply) = pending_link_reg.borrow_mut().take() {
-                        let _ = reply.send(Ok(global.id as u64));
-                    }
-                    // The proxy is already stored in our_links by the command
-                    // handler under u64::MAX; promote it to the real ID.
-                    let mut links = our_links_reg.borrow_mut();
-                    if let Some(proxy) = links.remove(&u64::MAX) {
-                        links.insert(global.id as u64, proxy);
-                    }
-                }
-                _ => {}
+        .global(move |global| match global.type_ {
+            pw::types::ObjectType::Node => {
+                handle_node_global(
+                    global,
+                    &event_tx_reg,
+                    &pending_sink_reg,
+                    &our_sinks_reg,
+                );
             }
+            pw::types::ObjectType::Link => {
+                handle_link_global(global, &pending_link_reg, &our_links_reg);
+            }
+            _ => {}
         })
         .global_remove(move |id| {
             let _ = event_tx.send(BackendEvent::NodeRemoved(id));
         })
         .register();
-
-    // -------------------------------------------------------------------------
-    // Create the always-present bus sink nodes
-    // -------------------------------------------------------------------------
-
-    for (suffix, description) in &BUS_NODES {
-        let node_name = format!("{}{}", AMPLITUDE_PREFIX, suffix);
-
-        let props = properties! {
-            "factory.name"     => "support.null-audio-sink",
-            "node.name"        => node_name.as_str(),
-            "node.description" => *description,
-            "media.class"      => "Audio/Sink",
-            "audio.position"   => "[ FL FR ]",
-            "node.virtual"     => "true",
-            // Drive its own clock so the node is always active (not suspended),
-            // making its monitor ports produce audio without a hardware device.
-            "node.driver"      => "true",
-        };
-
-        match core.create_object::<pw::node::Node>("adapter", &props) {
-            Ok(proxy) => {
-                our_bus_sinks.borrow_mut().insert(suffix.to_string(), proxy);
-                pending_bus_sinks
-                    .borrow_mut()
-                    .insert(suffix.to_string(), false);
-            }
-            Err(e) => {
-                eprintln!(
-                    "[pipewire] failed to create bus sink '{suffix}': {e}"
-                );
-            }
-        }
-    }
 
     // -------------------------------------------------------------------------
     // Command channel — attached to the mainloop for wakeup on new commands
@@ -328,7 +275,8 @@ fn pw_thread(
                 input_node_id,
                 reply,
             } => {
-                *pending_link_cmd.borrow_mut() = Some(reply);
+                *pending_link_cmd.borrow_mut() =
+                    Some((output_node_id, input_node_id, reply));
 
                 let out_str = output_node_id.to_string();
                 let in_str = input_node_id.to_string();
@@ -336,8 +284,6 @@ fn pw_thread(
                 let props = properties! {
                     "link.output.node" => out_str.as_str(),
                     "link.input.node"  => in_str.as_str(),
-                    // Keep the link alive even after Amplitude disconnects.
-                    "object.linger"    => "true",
                 };
 
                 match core_cmd
@@ -349,7 +295,7 @@ fn pw_thread(
                         our_links_cmd.borrow_mut().insert(u64::MAX, proxy);
                     }
                     Err(e) => {
-                        if let Some(reply) =
+                        if let Some((_, _, reply)) =
                             pending_link_cmd.borrow_mut().take()
                         {
                             let _ = reply.send(Err(format!(
@@ -371,7 +317,7 @@ fn pw_thread(
 }
 
 // ---------------------------------------------------------------------------
-// Registry node-global handler (extracted to keep pw_thread readable)
+// Registry global handlers (extracted to keep pw_thread readable)
 // ---------------------------------------------------------------------------
 
 fn handle_node_global(
@@ -380,9 +326,7 @@ fn handle_node_global(
     >,
     event_tx: &mpsc::Sender<BackendEvent>,
     pending_sink: &Rc<RefCell<Option<(String, crate::audio::SinkReply)>>>,
-    pending_bus_sinks: &Rc<RefCell<HashMap<String, bool>>>,
     our_sinks: &Rc<RefCell<HashMap<u64, pw::node::Node>>>,
-    bus_sink_ids: &Rc<RefCell<HashMap<String, u64>>>,
 ) {
     let props = match global.props {
         Some(p) => p,
@@ -401,29 +345,17 @@ fn handle_node_global(
             .unwrap_or("")
             .to_owned();
 
-        // Check if this is one of the always-present bus sinks.
-        if pending_bus_sinks.borrow().contains_key(&suffix) {
-            bus_sink_ids
-                .borrow_mut()
-                .insert(suffix.clone(), global.id as u64);
-            pending_bus_sinks.borrow_mut().insert(suffix.clone(), true);
-            // Bus sinks are surfaced as NodeAdded so the engine can
-            // pick up their IDs via poll_events.
-        }
-
-        // Check if this is a pending channel sink creation.
-        {
-            let mut pending = pending_sink.borrow_mut();
-            if let Some((ref expected_name, _)) = *pending {
-                if suffix == *expected_name {
-                    // Promote proxy from sentinel to real ID.
-                    let mut sinks = our_sinks.borrow_mut();
-                    if let Some(proxy) = sinks.remove(&u64::MAX) {
-                        sinks.insert(global.id as u64, proxy);
-                    }
-                    if let Some((_, reply)) = pending.take() {
-                        let _ = reply.send(Ok(global.id as u64));
-                    }
+        // Resolve a pending channel or bus sink creation command.
+        let mut pending = pending_sink.borrow_mut();
+        if let Some((ref expected_name, _)) = *pending {
+            if suffix == *expected_name {
+                // Promote proxy from sentinel to real ID.
+                let mut sinks = our_sinks.borrow_mut();
+                if let Some(proxy) = sinks.remove(&u64::MAX) {
+                    sinks.insert(global.id as u64, proxy);
+                }
+                if let Some((_, reply)) = pending.take() {
+                    let _ = reply.send(Ok(global.id as u64));
                 }
             }
         }
@@ -446,6 +378,46 @@ fn handle_node_global(
     };
 
     let _ = event_tx.send(BackendEvent::NodeAdded(info));
+}
+
+fn handle_link_global(
+    global: &pipewire::registry::GlobalObject<
+        &pipewire::spa::utils::dict::DictRef,
+    >,
+    pending_link: &PendingLink,
+    our_links: &Rc<RefCell<HashMap<u64, pw::link::Link>>>,
+) {
+    // Read the node IDs this link connects so we can validate against the
+    // pending creation request. Without this, any foreign or pre-existing
+    // Link global event would consume the pending reply slot prematurely.
+    let (link_out, link_in) = match global.props {
+        Some(props) => {
+            let out = props
+                .get("link.output.node")
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
+            let inp = props
+                .get("link.input.node")
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
+            (out, inp)
+        }
+        None => (0, 0),
+    };
+
+    let mut pending = pending_link.borrow_mut();
+    if let Some((expected_out, expected_in, _)) = pending.as_ref() {
+        if link_out == *expected_out && link_in == *expected_in {
+            // Promote proxy from sentinel to real ID.
+            let mut links = our_links.borrow_mut();
+            if let Some(proxy) = links.remove(&u64::MAX) {
+                links.insert(global.id as u64, proxy);
+            }
+            if let Some((_, _, reply)) = pending.take() {
+                let _ = reply.send(Ok(global.id as u64));
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-use crate::audio::Sink;
+use crate::audio::{Link, Sink};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -14,6 +14,15 @@ pub struct Channel {
     /// recreated fresh on every startup.
     #[serde(skip)]
     pub virtual_sink: Sink,
+    /// Runtime-only: current link from a physical source into this channel's
+    /// virtual sink. At most one active input link per channel; replaced when
+    /// the user selects a different input device.
+    #[serde(skip)]
+    pub input_link: Option<Link>,
+    /// Runtime-only: one link per bus this channel feeds into.
+    /// Populated by `wire_channel_to_buses` after the channel sink is live.
+    #[serde(skip)]
+    pub bus_links: Vec<Link>,
 }
 
 impl Channel {
@@ -24,6 +33,8 @@ impl Channel {
             sends,
             connections: Vec::new(),
             virtual_sink,
+            input_link: None,
+            bus_links: Vec::new(),
         }
     }
 }

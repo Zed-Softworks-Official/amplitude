@@ -1,5 +1,5 @@
 use crate::audio::node::NodeInfo;
-use crate::audio::{AudioBackend, BackendEvent, Link};
+use crate::audio::{AudioBackend, BackendEvent, Link, Sink};
 use crate::core::{
     bus::Bus,
     channels::{Channel, Connection, Send},
@@ -16,8 +16,9 @@ use crate::backend::pipewire::create_backend;
 use crate::backend::coreaudio::create_backend;
 
 // ---------------------------------------------------------------------------
-// Internal name suffixes that map engine Bus UUIDs to PW bus sink nodes.
-// Must match the BUS_NODES constant in backend/pipewire.rs.
+// Internal name suffixes used when creating bus sink nodes.
+// These determine the `node.name` in PipeWire ("amplitude-monitor", etc.)
+// and are matched back by `bus_uuid_for_node_name` for observability.
 // ---------------------------------------------------------------------------
 
 const BUS_SUFFIX_MONITOR: &str = "monitor";
@@ -39,25 +40,31 @@ pub struct AudioEngine {
     pub channel_order: Vec<Uuid>,
     /// Live cache of PipeWire nodes keyed by their PW global ID.
     pub nodes: HashMap<u32, NodeInfo>,
-    /// Maps each Bus UUID to the PW global ID of its corresponding sink node.
-    /// Populated reactively when the PW backend reports the bus sink as NodeAdded.
-    bus_sink_ids: HashMap<Uuid, u64>,
-    /// Maps each Channel UUID to the channel→bus links it owns (one per bus).
-    channel_links: HashMap<Uuid, Vec<Link>>,
-    /// Maps each Channel UUID to its current input link (physical source → channel sink).
-    /// At most one active input link per channel; replacing it destroys the previous one.
-    channel_input_links: HashMap<Uuid, Link>,
-    /// Maps each Bus UUID to its current output link (bus sink monitor → physical output).
-    /// At most one active output link per bus; replacing it destroys the previous one.
-    bus_output_links: HashMap<Uuid, Link>,
 }
 
 impl AudioEngine {
     pub fn new() -> Self {
-        let backend = create_backend();
+        let mut backend = create_backend();
 
-        let monitor_bus = Bus::new(BUS_SUFFIX_MONITOR.to_string());
-        let stream_bus = Bus::new(BUS_SUFFIX_STREAM.to_string());
+        // Create bus sinks synchronously — blocks until the platform confirms
+        // each node is live. This guarantees bus IDs are known before any
+        // channel is created, eliminating the startup race condition.
+        let monitor_sink = backend
+            .create_bus_sink(BUS_SUFFIX_MONITOR)
+            .unwrap_or_else(|e| {
+                eprintln!("[engine] failed to create monitor bus sink: {e}");
+                Sink::new(0)
+            });
+        let stream_sink = backend
+            .create_bus_sink(BUS_SUFFIX_STREAM)
+            .unwrap_or_else(|e| {
+                eprintln!("[engine] failed to create stream bus sink: {e}");
+                Sink::new(0)
+            });
+
+        let monitor_bus =
+            Bus::new(BUS_SUFFIX_MONITOR.to_string(), monitor_sink);
+        let stream_bus = Bus::new(BUS_SUFFIX_STREAM.to_string(), stream_sink);
 
         let default_sends = vec![
             Send::new(monitor_bus.id, monitor_bus.volume, monitor_bus.muted),
@@ -76,10 +83,6 @@ impl AudioEngine {
             default_sends,
             channel_order: Vec::new(),
             nodes: HashMap::new(),
-            bus_sink_ids: HashMap::new(),
-            channel_links: HashMap::new(),
-            channel_input_links: HashMap::new(),
-            bus_output_links: HashMap::new(),
         };
 
         engine.ensure_mic_channel();
@@ -89,10 +92,20 @@ impl AudioEngine {
 
     /// Load state from a saved config, then guarantee the mic channel exists.
     pub fn from_config(config: Config) -> Self {
-        let backend = create_backend();
+        let mut backend = create_backend();
 
+        // Recreate each bus's virtual sink synchronously before touching
+        // channels. This mirrors Bus::new taking a Sink: the persisted Bus
+        // carries no live node ID, so we create a fresh one here.
         let mut buses = HashMap::new();
-        for (_id, bus) in config.buses {
+        for (_id, mut bus) in config.buses {
+            bus.sink = backend.create_bus_sink(&bus.name).unwrap_or_else(|e| {
+                eprintln!(
+                    "[engine] failed to recreate sink for bus '{}': {e}",
+                    bus.name
+                );
+                Sink::new(0)
+            });
             buses.insert(bus.id, bus);
         }
 
@@ -128,10 +141,6 @@ impl AudioEngine {
             default_sends,
             channel_order,
             nodes: HashMap::new(),
-            bus_sink_ids: HashMap::new(),
-            channel_links: HashMap::new(),
-            channel_input_links: HashMap::new(),
-            bus_output_links: HashMap::new(),
         };
 
         engine.recreate_virtual_sinks();
@@ -144,34 +153,30 @@ impl AudioEngine {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    /// Recreate the PipeWire virtual sink for every channel loaded from config.
+    /// Recreate the virtual sink for every channel loaded from config and wire
+    /// each channel to all buses whose sinks are live.
     ///
     /// Channels restored from disk have `virtual_sink.external_id == 0` because
-    /// the field is skipped during serialisation. This method creates a fresh PW
-    /// node for each channel and writes the new runtime ID back, so that
-    /// `wire_all_channels_to_bus` can create valid links once the bus sinks
-    /// are discovered.
+    /// the field is skipped during serialisation. This method creates a fresh
+    /// node for each channel, writes the new runtime ID back, then wires it to
+    /// every bus sink (which are guaranteed live at this point).
     fn recreate_virtual_sinks(&mut self) {
-        let names: Vec<(Uuid, String)> = self
-            .channels
-            .values()
-            .map(|ch| (ch.id, ch.name.clone()))
-            .collect();
+        let ids: Vec<Uuid> = self.channels.keys().copied().collect();
 
-        for (id, name) in names {
+        for id in ids {
+            let name = self.channels[&id].name.clone();
             match self.backend.create_virtual_sink(&name) {
                 Ok(sink) => {
-                    if let Some(ch) = self.channels.get_mut(&id) {
-                        ch.virtual_sink = sink;
-                    }
+                    self.channels.get_mut(&id).unwrap().virtual_sink = sink;
+                    self.wire_channel_to_buses(id);
                 }
                 Err(e) => {
                     eprintln!(
                         "[engine] failed to recreate sink for channel \
                          '{name}': {e}"
                     );
-                    // external_id stays 0; wire_all_channels_to_bus
-                    // already skips channels with external_id == 0.
+                    // external_id stays 0; wire_channel_to_buses skips
+                    // channels with external_id == 0.
                 }
             }
         }
@@ -188,10 +193,9 @@ impl AudioEngine {
             let sink =
                 self.backend.create_virtual_sink("mic").unwrap_or_else(|e| {
                     eprintln!("[engine] failed to create mic sink: {e}");
-                    crate::audio::Sink::new(0)
+                    Sink::new(0)
                 });
 
-            let sink_node_id = sink.external_id;
             let mic = Channel::new(
                 "mic".to_string(),
                 self.default_sends.clone(),
@@ -201,29 +205,38 @@ impl AudioEngine {
             self.channels.insert(mic_id, mic);
             self.channel_order.push(mic_id);
 
-            if sink_node_id != 0 {
-                self.wire_channel_to_buses(mic_id, sink_node_id);
-            }
+            self.wire_channel_to_buses(mic_id);
         }
     }
 
-    /// Create PipeWire links from a channel's virtual sink to every bus sink
-    /// that already has a known PW node ID.
-    fn wire_channel_to_buses(&mut self, channel_id: Uuid, sink_node_id: u64) {
-        let bus_ids: Vec<(Uuid, u64)> = self
-            .bus_sink_ids
-            .iter()
-            .map(|(bus_uuid, pw_id)| (*bus_uuid, *pw_id))
+    /// Create PipeWire links from `channel_id`'s virtual sink to every bus
+    /// sink that has a live node ID. Stores the resulting links on the channel.
+    fn wire_channel_to_buses(&mut self, channel_id: Uuid) {
+        let sink_node_id = match self.channels.get(&channel_id) {
+            Some(ch) if ch.virtual_sink.external_id != 0 => {
+                ch.virtual_sink.external_id
+            }
+            _ => return,
+        };
+
+        // Collect (bus_uuid, bus_pw_id) for all live bus sinks.
+        let bus_pairs: Vec<(Uuid, u64)> = self
+            .buses
+            .values()
+            .filter(|b| b.sink.external_id != 0)
+            .map(|b| (b.id, b.sink.external_id))
             .collect();
 
-        for (bus_uuid, bus_pw_id) in bus_ids {
+        for (bus_uuid, bus_pw_id) in bus_pairs {
             match self.backend.create_link(sink_node_id, bus_pw_id) {
                 Ok(link_id) => {
-                    let link = Link::new(link_id, sink_node_id, bus_pw_id);
-                    self.channel_links
-                        .entry(channel_id)
-                        .or_default()
-                        .push(link);
+                    if let Some(ch) = self.channels.get_mut(&channel_id) {
+                        ch.bus_links.push(Link::new(
+                            link_id,
+                            sink_node_id,
+                            bus_pw_id,
+                        ));
+                    }
                 }
                 Err(e) => {
                     eprintln!(
@@ -235,55 +248,6 @@ impl AudioEngine {
         }
     }
 
-    /// Create missing links from every existing channel to a newly discovered
-    /// bus sink node.
-    fn wire_all_channels_to_bus(&mut self, bus_uuid: Uuid, bus_pw_id: u64) {
-        let channel_ids: Vec<(Uuid, u64)> = self
-            .channels
-            .values()
-            .map(|ch| (ch.id, ch.virtual_sink.external_id))
-            .collect();
-
-        for (channel_id, sink_node_id) in channel_ids {
-            // Skip stub sinks (external_id == 0).
-            if sink_node_id == 0 {
-                continue;
-            }
-            // Skip if a link to this bus already exists for this channel.
-            let already_linked = self
-                .channel_links
-                .get(&channel_id)
-                .map(|links| links.iter().any(|l| l.input_node_id == bus_pw_id))
-                .unwrap_or(false);
-
-            if already_linked {
-                continue;
-            }
-
-            match self.backend.create_link(sink_node_id, bus_pw_id) {
-                Ok(link_id) => {
-                    let link = Link::new(link_id, sink_node_id, bus_pw_id);
-                    self.channel_links
-                        .entry(channel_id)
-                        .or_default()
-                        .push(link);
-                }
-                Err(e) => {
-                    eprintln!(
-                        "[engine] failed to link channel {channel_id} \
-                         to new bus {bus_uuid}: {e}"
-                    );
-                }
-            }
-        }
-    }
-
-    /// Resolve an `amplitude-*` node name to its engine Bus UUID, if any.
-    fn bus_uuid_for_node_name(&self, node_name: &str) -> Option<Uuid> {
-        let suffix = node_name.strip_prefix("amplitude-")?;
-        self.buses.values().find(|b| b.name == suffix).map(|b| b.id)
-    }
-
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -291,20 +255,21 @@ impl AudioEngine {
     /// Route a physical input node (microphone, line-in, etc.) into the given
     /// channel's virtual sink. Replaces any previously set input link.
     ///
-    /// `input_node_id` is the PipeWire global ID of the source node.
+    /// `input_node_id` is the platform-specific global ID of the source node.
     pub fn set_channel_input(
         &mut self,
         channel_id: Uuid,
         input_node_id: u64,
     ) -> Result<(), String> {
-        let sink_node_id = self
+        let channel = self
             .channels
-            .get(&channel_id)
-            .map(|ch| ch.virtual_sink.external_id)
+            .get_mut(&channel_id)
             .ok_or_else(|| format!("channel {channel_id} not found"))?;
 
+        let sink_node_id = channel.virtual_sink.external_id;
+
         // Destroy the previous input link for this channel, if any.
-        if let Some(old) = self.channel_input_links.remove(&channel_id) {
+        if let Some(old) = channel.input_link.take() {
             if let Err(e) = self.backend.destroy_link(old.id) {
                 eprintln!(
                     "[engine] failed to destroy old input link {}: {e}",
@@ -313,13 +278,11 @@ impl AudioEngine {
             }
         }
 
-        // A physical source (Audio/Source) connects as:
-        //   output_node = source node  →  input_node = channel sink
+        // Physical source → channel sink.
         let link_id = self.backend.create_link(input_node_id, sink_node_id)?;
-        self.channel_input_links.insert(
-            channel_id,
-            Link::new(link_id, input_node_id, sink_node_id),
-        );
+        let channel = self.channels.get_mut(&channel_id).unwrap();
+        channel.input_link =
+            Some(Link::new(link_id, input_node_id, sink_node_id));
 
         Ok(())
     }
@@ -327,19 +290,25 @@ impl AudioEngine {
     /// Route the monitor output of a bus's virtual sink to a physical output
     /// device. Replaces any previously set output link for this bus.
     ///
-    /// `output_node_id` is the PipeWire global ID of the physical sink node.
+    /// `output_node_id` is the platform-specific global ID of the physical
+    /// sink node.
     pub fn set_bus_output(
         &mut self,
         bus_id: Uuid,
         output_node_id: u64,
     ) -> Result<(), String> {
-        let bus_sink_pw_id =
-            *self.bus_sink_ids.get(&bus_id).ok_or_else(|| {
-                format!("bus {bus_id} has no known PipeWire sink node yet")
-            })?;
+        let bus = self
+            .buses
+            .get_mut(&bus_id)
+            .ok_or_else(|| format!("bus {bus_id} not found"))?;
+
+        let bus_sink_pw_id = bus.sink.external_id;
+        if bus_sink_pw_id == 0 {
+            return Err(format!("bus {bus_id} has no live sink node"));
+        }
 
         // Destroy the previous output link for this bus, if any.
-        if let Some(old) = self.bus_output_links.remove(&bus_id) {
+        if let Some(old) = bus.output_link.take() {
             if let Err(e) = self.backend.destroy_link(old.id) {
                 eprintln!(
                     "[engine] failed to destroy old output link {}: {e}",
@@ -348,20 +317,20 @@ impl AudioEngine {
             }
         }
 
-        // Bus sink monitor → physical output:
-        //   output_node = bus sink  →  input_node = physical output device
+        // Bus sink monitor → physical output.
         let link_id =
             self.backend.create_link(bus_sink_pw_id, output_node_id)?;
-        self.bus_output_links
-            .insert(bus_id, Link::new(link_id, bus_sink_pw_id, output_node_id));
+        let bus = self.buses.get_mut(&bus_id).unwrap();
+        bus.output_link =
+            Some(Link::new(link_id, bus_sink_pw_id, output_node_id));
 
         Ok(())
     }
 
-    /// Create a virtual sink via the backend, then build and register a channel.
+    /// Create a virtual sink via the backend, wire it to all buses, then
+    /// build and register a new channel.
     pub fn add_channel(&mut self, name: String) -> Result<Channel, String> {
         let sink = self.backend.create_virtual_sink(&name)?;
-        let sink_node_id = sink.external_id;
         let channel = Channel::new(name, self.default_sends.clone(), sink);
         let id = channel.id;
         self.channels.insert(id, channel.clone());
@@ -369,11 +338,9 @@ impl AudioEngine {
             self.channel_order.push(id);
         }
 
-        if sink_node_id != 0 {
-            self.wire_channel_to_buses(id, sink_node_id);
-        }
+        self.wire_channel_to_buses(id);
 
-        Ok(channel)
+        Ok(self.channels[&id].clone())
     }
 
     /// Destroy all links for a channel, then destroy its sink, then remove it.
@@ -387,8 +354,10 @@ impl AudioEngine {
             return Err(format!("channel {id} not found"));
         }
 
-        // Destroy input link first.
-        if let Some(link) = self.channel_input_links.remove(&id) {
+        let mut channel = self.channels.remove(&id).unwrap();
+
+        // Destroy input link.
+        if let Some(link) = channel.input_link.take() {
             if let Err(e) = self.backend.destroy_link(link.id) {
                 eprintln!(
                     "[engine] failed to destroy input link {}: {e}",
@@ -398,18 +367,15 @@ impl AudioEngine {
         }
 
         // Destroy channel→bus links.
-        if let Some(links) = self.channel_links.remove(&id) {
-            for link in links {
-                if let Err(e) = self.backend.destroy_link(link.id) {
-                    eprintln!(
-                        "[engine] failed to destroy link {}: {e}",
-                        link.id
-                    );
-                }
+        for link in channel.bus_links.drain(..) {
+            if let Err(e) = self.backend.destroy_link(link.id) {
+                eprintln!(
+                    "[engine] failed to destroy bus link {}: {e}",
+                    link.id
+                );
             }
         }
 
-        let channel = self.channels.remove(&id).unwrap();
         self.backend.destroy_virtual_sink(&channel.virtual_sink)?;
         self.channel_order.retain(|oid| *oid != id);
 
@@ -512,35 +478,14 @@ impl AudioEngine {
         Ok(())
     }
 
-    /// Drain pending backend events, update caches, and return the events.
-    /// When a bus sink node is seen for the first time its ID is stored and
-    /// all existing channels are immediately linked to it.
+    /// Drain pending backend events and update the node cache.
     pub fn poll_events(&mut self) -> Vec<BackendEvent> {
         let events = self.backend.poll_events();
-
-        // Collect bus discoveries first so we can call &mut self methods after.
-        let mut new_bus_nodes: Vec<(Uuid, u64)> = Vec::new();
 
         for event in &events {
             match event {
                 BackendEvent::NodeAdded(info) => {
                     self.nodes.insert(info.id, info.clone());
-
-                    // If this is one of our bus sink nodes and we haven't
-                    // recorded its PW ID yet, note it for wiring below.
-                    if info.is_amplitude_virtual {
-                        if let Some(bus_uuid) =
-                            self.bus_uuid_for_node_name(&info.name)
-                        {
-                            if let std::collections::hash_map::Entry::Vacant(
-                                e,
-                            ) = self.bus_sink_ids.entry(bus_uuid)
-                            {
-                                e.insert(info.id as u64);
-                                new_bus_nodes.push((bus_uuid, info.id as u64));
-                            }
-                        }
-                    }
                 }
                 BackendEvent::NodeRemoved(id) => {
                     self.nodes.remove(id);
@@ -548,15 +493,10 @@ impl AudioEngine {
             }
         }
 
-        // Wire all existing channels to any newly discovered bus sinks.
-        for (bus_uuid, bus_pw_id) in new_bus_nodes {
-            self.wire_all_channels_to_bus(bus_uuid, bus_pw_id);
-        }
-
         events
     }
 
-    /// Returns all currently known nodes sorted by PW global ID.
+    /// Returns all currently known nodes sorted by platform global ID.
     pub fn get_nodes(&self) -> Vec<NodeInfo> {
         let mut nodes: Vec<NodeInfo> = self.nodes.values().cloned().collect();
         nodes.sort_by_key(|n| n.id);
